@@ -2,12 +2,23 @@
 // Created by root on 3/7/26.
 //
 
-#include <libsdb/error.h>
-#include <libsdb/process.h>
 #include <sys/ptrace.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <libsdb/error.h>
+#include <libsdb/pipe.h>
+#include <libsdb/process.h>
+
+namespace {
+    // Write errors in child process to parent process using pipe
+    void exit_with_perror(sdb::pipe& channel, std::string const& prefix) {
+        auto message = prefix + ": " + std::strerror(errno);
+        channel.write(
+            reinterpret_cast<std::byte*>(message.data()), message.size());
+        exit(-1);
+    }
+}
 
 sdb::stop_reason::stop_reason(int wait_status) {
     if (WIFEXITED(wait_status)) {
@@ -23,19 +34,34 @@ sdb::stop_reason::stop_reason(int wait_status) {
 }
 
 std::unique_ptr<sdb::process> sdb::process::launch(const std::filesystem::path& path) {
+    // Pipe for communicating errors when spawning new processes
+    pipe channel(true);
+
     pid_t pid;
     if ((pid = fork()) < 0) {
         error::send_errno("Fork failed");
     }
 
+    // In child process
     if (pid == 0) {
+        channel.close_read();
         if (ptrace(PTRACE_TRACEME, 0, nullptr, nullptr) < 0) {
-            error::send_errno("Tracing failed");
+            exit_with_perror(channel, "Tracing failed");
         }
 
         if (execlp(path.c_str(), path.c_str(), nullptr) < 0) {
-            error::send_errno("Exec failed");
+            exit_with_perror(channel, "Exec failed");
         }
+    }
+
+    // Parent reads pipe and throws exception if child wrote to it
+    channel.close_write();
+    auto data = channel.read();
+
+    if (!data.empty()) {
+        waitpid(pid, nullptr, 0);
+        auto chars = reinterpret_cast<char*>(data.data());
+        error::send(std::string(chars, chars + data.size()));
     }
 
     std::unique_ptr<process> proc (new process(pid, true));

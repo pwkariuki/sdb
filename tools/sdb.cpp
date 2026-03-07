@@ -1,17 +1,18 @@
 //
 // Created by root on 3/4/26.
 //
+
 #include <algorithm>
 #include <editline/readline.h>
 #include <iostream>
-#include <libsdb/error.h>
-#include <libsdb/process.h>
 #include <sstream>
 #include <cstring>
 #include <string>
 #include <string_view>
 #include <sys/types.h>
 #include <vector>
+#include <libsdb/error.h>
+#include <libsdb/process.h>
 
 namespace {
     std::unique_ptr<sdb::process> attach(int argc, const char **argv) {

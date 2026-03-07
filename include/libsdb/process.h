@@ -35,7 +35,6 @@ namespace sdb {
 
         void resume();
         stop_reason wait_on_signal();
-        pid_t pid() const { return pid_; }
 
         // Disable default constructor and copy operations
         process() = delete;
@@ -45,6 +44,7 @@ namespace sdb {
         // Destructor: clean up inferior processes we launch, leave running otherwise
         ~process();
 
+        pid_t pid() const { return pid_; }
         process_state state() const { return state_; }
 
     private:
