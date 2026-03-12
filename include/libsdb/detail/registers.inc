@@ -3,7 +3,7 @@
 #endif
 
 // Get offset of a GPR inside the user struct
-#define GPR_OFFSET(reg) (offsetof(user, reg) + offsetof(user_reg_struct, reg))
+#define GPR_OFFSET(reg) (offsetof(user, regs) + offsetof(user_regs_struct, reg))
 
 // Define 64-bit GPR
 #define DEFINE_GPR_64(name, dwarf_id) \

@@ -55,6 +55,11 @@ namespace sdb {
 
         void write_user_area(std::size_t offset, std::uint64_t data);
 
+        // Write to all x87 registers
+        void write_fprs(const user_fpregs_struct& fprs);
+        // Write to all GPRs a
+        void write_gprs(const user_regs_struct& gprs);
+
     private:
         pid_t pid_ = 0;
         bool terminate_on_end_ = true;

@@ -23,7 +23,7 @@ namespace sdb {
 
     // GPR, a subregister of GPR, an FPR, or debug register
     enum class register_type {
-gpr, sub_gpr,fpr,dr
+        gpr, sub_gpr,fpr,dr
     };
 
     // Different ways of interpreting a register
