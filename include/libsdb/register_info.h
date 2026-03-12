@@ -23,12 +23,12 @@ namespace sdb {
 
     // GPR, a subregister of GPR, an FPR, or debug register
     enum class register_type {
-        gpr, sub_gpr,fpr,dr
+        gpr, sub_gpr, fpr, dr
     };
 
     // Different ways of interpreting a register
     enum class register_format {
-        uint, double_float,long_double,vector,
+        uint, double_float, long_double, vector,
     };
 
     struct register_info {

@@ -34,7 +34,8 @@ sdb::stop_reason::stop_reason(int wait_status) {
 }
 
 std::unique_ptr<sdb::process> sdb::process::launch(
-    const std::filesystem::path& path, bool debug) {
+    const std::filesystem::path& path, bool debug,
+    std::optional<int> stdout_replacement) {
     // Pipe for communicating errors when spawning new processes
     pipe channel(true);
 
@@ -46,6 +47,13 @@ std::unique_ptr<sdb::process> sdb::process::launch(
     // In child process
     if (pid == 0) {
         channel.close_read();
+
+        if (stdout_replacement) {
+            if (dup2(*stdout_replacement, STDOUT_FILENO) < 0) {
+                exit_with_perror(channel, "stdout replacement failed");
+            }
+        }
+
         if (debug and ptrace(PTRACE_TRACEME, 0, nullptr, nullptr) < 0) {
             exit_with_perror(channel, "Tracing failed");
         }

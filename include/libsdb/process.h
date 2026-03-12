@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <sys/types.h>
 #include <libsdb/registers.h>
 
@@ -32,7 +33,8 @@ namespace sdb {
     class process {
     public:
         static std::unique_ptr<process> launch(const std::filesystem::path& path,
-                                                bool debug = true);
+                                                bool debug = true,
+                                                std::optional<int> stdout_replacement = std::nullopt);
         static std::unique_ptr<process> attach(pid_t pid);
 
         void resume();
@@ -57,7 +59,7 @@ namespace sdb {
 
         // Write to all x87 registers
         void write_fprs(const user_fpregs_struct& fprs);
-        // Write to all GPRs a
+        // Write to all GPRs
         void write_gprs(const user_regs_struct& gprs);
 
     private:
