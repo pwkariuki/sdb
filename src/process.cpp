@@ -96,6 +96,11 @@ sdb::stop_reason sdb::process::wait_on_signal() {
     }
     stop_reason reason(wait_status);
     state_ = reason.reason;
+
+    if (is_attached_ and state_ == process_state::stopped) {
+        read_all_registers();
+    }
+
     return reason;
 }
 
@@ -124,4 +129,32 @@ void sdb::process::resume() {
         error::send_errno("Could not resume");
     }
     state_ = process_state::running;
+}
+
+void sdb::process::read_all_registers() {
+    if (ptrace(PTRACE_GETREGS, pid_, nullptr, &get_registers().data_.regs) < 0) {
+        error::send_errno("Could not read GPR registers");
+    }
+    if (ptrace(PTRACE_GETFPREGS, pid_, nullptr, &get_registers().data_.i387) < 0) {
+        error::send_errno("Could not read FPR registers");
+    }
+    for (int i = 0; i < 8; ++i) {
+        // Read debug registers
+        auto id = static_cast<int>(register_id::dr0) + i;
+        auto info = register_info_by_id(static_cast<register_id>(id));
+
+        errno = 0;
+        std::int64_t data = ptrace(PTRACE_PEEKUSER, pid_, info.offset, nullptr);
+        if (errno != 0) {
+            error::send_errno("Could not read debug register");
+        }
+
+        get_registers().data_.u_debugreg[i] = data;
+    }
+}
+
+void sdb::process::write_user_area(std::size_t offset, std::uint64_t data) {
+    if (ptrace(PTRACE_POKEUSER, pid_, offset, data) < 0) {
+        error::send_errno("Could not write to user area");
+    }
 }
