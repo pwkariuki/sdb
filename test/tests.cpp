@@ -6,7 +6,9 @@
 #include <csignal>
 #include <fstream>
 #include <sys/types.h>
+#include <libsdb/bit.h>
 #include <libsdb/error.h>
+#include <libsdb/pipe.h>
 #include <libsdb/process.h>
 
 using namespace sdb;
@@ -71,4 +73,25 @@ TEST_CASE("process::resume already terminated", "[process]") {
     proc->resume();
     proc->wait_on_signal();
     REQUIRE_THROWS_AS(proc->resume(), error);
+}
+
+TEST_CASE("write register works", "[register]") {
+    bool close_on_exec = false;
+    sdb::pipe channel(close_on_exec);
+
+    auto proc = process::launch(
+        "targets/reg_write", true, channel.get_write());
+    channel.close_write();
+
+    proc->resume(); // resume until first trap
+    proc->wait_on_signal();
+
+    auto& regs = proc->get_registers();
+    regs.write_by_id(register_id::rsi, 0xcafecafe);
+
+    proc->resume();
+    proc->wait_on_signal();
+
+    auto output = channel.read();
+    REQUIRE(to_string_view(output) == "0xcafecafe");
 }
