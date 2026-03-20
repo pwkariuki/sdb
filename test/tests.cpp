@@ -86,6 +86,7 @@ TEST_CASE("write register works", "[register]") {
     proc->resume(); // resume until first trap
     proc->wait_on_signal();
 
+    // Test GPRs
     auto& regs = proc->get_registers();
     regs.write_by_id(register_id::rsi, 0xcafecafe);
 
@@ -94,4 +95,33 @@ TEST_CASE("write register works", "[register]") {
 
     auto output = channel.read();
     REQUIRE(to_string_view(output) == "0xcafecafe");
+
+    // Test MMX registers
+    regs.write_by_id(register_id::mm0, 0xba5eba11);
+
+    proc->resume();
+    proc->wait_on_signal();
+
+    output = channel.read();
+    REQUIRE(to_string_view(output) == "0xba5eba11");
+
+    // Test SSE registers
+    regs.write_by_id(register_id::xmm0, 42.24);
+
+    proc->resume();
+    proc->wait_on_signal();
+
+    output = channel.read();
+    REQUIRE(to_string_view(output) == "42.24");
+
+    // Test x87 registers
+    regs.write_by_id(register_id::st0, 42.24l);
+    regs.write_by_id(register_id::fsw, std::uint16_t{0b0011100000000000});
+    regs.write_by_id(register_id::ftw, std::uint16_t{0b0011111111111111});
+
+    proc->resume();
+    proc->wait_on_signal();
+
+    output = channel.read();
+    REQUIRE(to_string_view(output) == "42.24");
 }

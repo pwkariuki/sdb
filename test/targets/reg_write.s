@@ -2,7 +2,8 @@
 
 .section .data
 
-hex_format: .asciz "%#x"
+hex_format:        .asciz "%#x"
+float_format:      .asciz "%.2f"
 
 .section .text
 
@@ -31,6 +32,25 @@ main:
     movq $0, %rdi               # pass 0 to fflush
     call fflush@plt             # flush alls streams
     trap
+
+    # Print contents of mm0
+    movq %mm0, %rsi
+    leaq hex_format(%rip), %rdi
+    movq $0, %rax
+    call printf@plt
+    movq $0, %rdi
+    call fflush@plt
+    trap
+
+    # Print contents of xmm0
+    leaq float_format(%rip), %rdi
+    movq $1, %rax
+    call printf@plt
+    movq $0, %rdi
+    call fflush@plt
+    trap
+
+    # Print cinontents of st0subq $16, %rspfstpt 9(%sprsp)movq $0, %rasxcall printf@pltmovq $0, %rdicall fflusgh@pltaddq $16, %rsptrap
 
     popq %rbp
     movq $0, %rax

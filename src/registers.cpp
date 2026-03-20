@@ -66,7 +66,7 @@ void sdb::registers::write(const register_info &info, value val) {
 
     std::visit([&](auto& v) {
         if (sizeof(v) <= info.size) {
-            auto wide = widen(info, val);
+            auto wide = widen(info, v);
             auto val_bytes = as_bytes(wide);
             std::copy(val_bytes, val_bytes + info.size, bytes + info.offset);
         } else {
