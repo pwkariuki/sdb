@@ -76,8 +76,12 @@ void sdb::registers::write(const register_info &info, value val) {
         }
     }, val);
 
-    // Align address to 8 bytes for PTRACE_PEEKUSER and PTRACE_POKEUSER
-    auto aligned_offset = info.offset & ~0b111;
-    proc_->write_user_area(aligned_offset,
-        from_bytes<std::uint64_t>(bytes + aligned_offset));
+    if (info.type == register_type::fpr) {
+        proc_->write_fprs(data_.i387);
+    } else {
+        // Align address to 8 bytes for PTRACE_PEEKUSER and PTRACE_POKEUSER
+        auto aligned_offset = info.offset & ~0b111;
+        proc_->write_user_area(aligned_offset,
+            from_bytes<std::uint64_t>(bytes + aligned_offset));
+    }
 }
