@@ -11,6 +11,7 @@
 #include <optional>
 #include <sys/types.h>
 #include <libsdb/registers.h>
+#include <libsdb/types.h>
 
 namespace sdb {
     // Running state of the process
@@ -61,6 +62,13 @@ namespace sdb {
         void write_fprs(const user_fpregs_struct& fprs);
         // Write to all GPRs
         void write_gprs(const user_regs_struct& gprs);
+
+        // Get program counter
+        virt_addr get_pc() const {
+            return virt_addr{
+                get_registers().read_by_id_as<uint64_t>(register_id::rip)
+            };
+        }
 
     private:
         pid_t pid_ = 0;

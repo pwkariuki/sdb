@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <vector>
 #include <libsdb/error.h>
+#include <libsdb/parse.h>
 #include <libsdb/process.h>
 
 namespace {
@@ -46,23 +47,26 @@ namespace {
     }
 
     void print_stop_reason(const sdb::process& process, sdb::stop_reason reason) {
-        std::cout << "Process " << process.pid() << " ";
+       std::string message;
 
         switch (reason.reason) {
             case sdb::process_state::exited:
-                std::cout << "exited with status " << static_cast<int>(reason.info);
+                message = fmt::format("exited with status ()",
+                     static_cast<int>(reason.info));
                 break;
             case sdb::process_state::terminated:
-                std::cout << "terminated with signal " << sigabbrev_np(reason.info);
+                message = fmt::format("terminated with signal {}",
+                    sigabbrev_np(reason.info));
                 break;
             case sdb::process_state::stopped:
-                std::cout << "stopped with signal " << sigabbrev_np(reason.info);
+                message = fmt::format("stopped with signal {}",
+                    sigabbrev_np(reason.info));
                 break;
             default:
                 break;
         }
 
-        std::cout << std::endl;
+        fmt::println("Process {} {}", process.pid(), message);
     }
 
     void print_help(const std::vector<std::string>& args) {
@@ -119,6 +123,49 @@ namespace {
             }
         } else {
             print_help({ "help", "register" });
+        }
+    }
+
+    sdb::registers::value parse_register_value(
+        sdb::register_info info, std::string_view text) {
+        try {
+            if (info.format == sdb::register_format::uint) {
+                switch (info.size) {
+                    case 1: return sdb::to_integral<std::uint8_t>(text, 16).value();
+                    case 2: return sdb::to_integral<std::uint16_t>(text, 16).value();
+                    case 4: return sdb::to_integral<std::uint32_t>(text, 16).value();
+                    case 8: return sdb::to_integral<std::uint64_t>(text, 16).value();
+                }
+            } else if (info.format == sdb::register_format::double_float) {
+                return sdb::to_float<double>(text).value();
+            } else if (info.format == sdb::register_format::long_double) {
+                return sdb::to_float<long double>(text).value();
+            } else if (info.format == sdb::register_format::vector) {
+                if (info.size == 8) {
+                    return sdb::parse_vector<8>(text);
+                }
+                if (info.size == 16) {
+                    return sdb::parse_vector<16>(text);
+                }
+            }
+        } catch (...) {}
+        sdb::error::send("Invalid format");
+    }
+
+    void handle_register_write(sdb::process& process,
+        const std::vector<std::string>& args) {
+        if (args.size() != 4) {
+            print_help({ "help", "register" });
+            return;
+        }
+
+        try {
+            auto info = sdb::register_info_by_name(args[2]);
+            auto value = parse_register_value(info, args[3]);
+            process.get_registers().write(info, value);
+        } catch (sdb::error& err) {
+            std::cerr << err.what() << std::endl;
+            return;
         }
     }
 
