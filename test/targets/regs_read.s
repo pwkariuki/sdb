@@ -13,6 +13,7 @@ my_double: .double 64.125
 .endm
 
 main:
+    # Prologue
     push    %rbp
     movq    %rsp, %rbp
 
@@ -43,6 +44,7 @@ main:
     fldl    my_double(%rip)
     trap
 
+    # Epilogue
     popq    %rbp
     movq    $0, %rax
     ret

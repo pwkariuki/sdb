@@ -51,7 +51,7 @@ namespace {
 
         switch (reason.reason) {
             case sdb::process_state::exited:
-                message = fmt::format("exited with status ()",
+                message = fmt::format("exited with status {}",
                      static_cast<int>(reason.info));
                 break;
             case sdb::process_state::terminated:
@@ -59,8 +59,8 @@ namespace {
                     sigabbrev_np(reason.info));
                 break;
             case sdb::process_state::stopped:
-                message = fmt::format("stopped with signal {}",
-                    sigabbrev_np(reason.info));
+                message = fmt::format("stopped with signal {} at {:#x}",
+                    sigabbrev_np(reason.info), process.get_pc().addr());
                 break;
             default:
                 break;

@@ -34,7 +34,7 @@ namespace {
 }
 
 // Get a pointer to the raw bytes of data_
-// Figure out where the bytes of the register data live bt adding the offset
+// Figure out where the bytes of the register data live by adding the offset
 // Convert those bytes into a type specified by the size and format fields
 sdb::registers::value sdb::registers::read(const register_info &info) const {
     auto bytes = as_bytes(data_);

@@ -66,6 +66,7 @@ std::unique_ptr<sdb::process> sdb::process::launch(
     // Parent reads pipe and throws exception if child wrote to it
     channel.close_write();
     auto data = channel.read();
+    channel.close_read();
 
     if (!data.empty()) {
         waitpid(pid, nullptr, 0);

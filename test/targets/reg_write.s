@@ -16,6 +16,7 @@ long_float_format:  .asciz "%.2Lf"
 .endm
 
 main:
+    # Prologue
     push    %rbp
     movq    %rsp, %rbp
 
@@ -62,6 +63,7 @@ main:
     addq    $16, %rsp
     trap
 
+    # Epilogue
     popq    %rbp
     movq    $0, %rax
     ret
