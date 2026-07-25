@@ -10,7 +10,9 @@
 #include <memory>
 #include <optional>
 #include <sys/types.h>
+#include <libsdb/breakpoint_site.h>
 #include <libsdb/registers.h>
+#include <libsdb/stoppoint_collection.h>
 #include <libsdb/types.h>
 
 namespace sdb {
@@ -70,12 +72,19 @@ namespace sdb {
             };
         }
 
+        breakpoint_site& create_breakpoint_site(virt_addr address);
+        stoppoint_collection<breakpoint_site>& breakpoint_sites()
+            { return breakpoint_sites_; }
+        const stoppoint_collection<breakpoint_site>& breakpoint_sites() const
+            { return breakpoint_sites_; }
+
     private:
         pid_t pid_ = 0;
         bool terminate_on_end_ = true;
         bool is_attached_ = true;
         process_state state_ = process_state::stopped;
         std::unique_ptr<registers> registers_;
+        stoppoint_collection<breakpoint_site> breakpoint_sites_;
 
         // Constructor to be used by static members
         process(pid_t pid, bool terminate_on_end, bool is_attached) :
