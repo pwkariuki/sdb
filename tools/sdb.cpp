@@ -26,7 +26,9 @@ namespace {
         }
         // Passing program name
         const char* program_path = argv[1];
-        return sdb::process::launch(program_path);
+        auto proc = sdb::process::launch(program_path);
+        fmt::println("Launched process with PID {}", proc->pid());
+        return proc;
     }
 
     std::vector<std::string> split(std::string_view str, char delimiter) {
@@ -75,6 +77,7 @@ namespace {
     breakpoint  - Commands for operating on breakpoints
     continue    - Resume the process
     register    - Commands for operating on registers
+    step        - Step over a singl
 )";
         }
         else if (is_prefix(args[1], "register")) {
@@ -266,6 +269,9 @@ namespace {
             handle_register_command(*process, args);
         } else if (is_prefix(command, "breakpoint")) {
             handle_breakpoint_command(*process, args);
+        } else if (is_prefix(command, "step")) {
+            auto reason = process->step_instruction();
+            print_stop_reason(*process, reason);
         } else {
             std::cerr << "Unknown command: " << command << std::endl;
         }

@@ -43,6 +43,9 @@ namespace sdb {
         void resume();
         stop_reason wait_on_signal();
 
+        // Step over machine instructions
+        sdb::stop_reason step_instruction();
+
         // Disable default constructor and copy operations
         process() = delete;
         process(const process&) = delete;
@@ -70,6 +73,11 @@ namespace sdb {
             return virt_addr{
                 get_registers().read_by_id_as<uint64_t>(register_id::rip)
             };
+        }
+
+        // Set program counter to specified address e.g. at breakpoints
+        void set_pc(virt_addr address) {
+            get_registers().write_by_id(register_id::rip, address.addr());
         }
 
         breakpoint_site& create_breakpoint_site(virt_addr address);
