@@ -77,7 +77,7 @@ namespace {
     breakpoint  - Commands for operating on breakpoints
     continue    - Resume the process
     register    - Commands for operating on registers
-    step        - Step over a singl
+    step        - Step over a single instruction
 )";
         }
         else if (is_prefix(args[1], "register")) {
