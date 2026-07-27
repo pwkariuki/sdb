@@ -44,7 +44,7 @@ namespace sdb {
         stop_reason wait_on_signal();
 
         // Step over machine instructions
-        sdb::stop_reason step_instruction();
+        stop_reason step_instruction();
 
         // Disable default constructor and copy operations
         process() = delete;
@@ -85,6 +85,15 @@ namespace sdb {
             { return breakpoint_sites_; }
         const stoppoint_collection<breakpoint_site>& breakpoint_sites() const
             { return breakpoint_sites_; }
+
+        // Read and write memory operations
+        std::vector<std::byte> read_memory(virt_addr address, std::size_t amount) const;
+        void write_memory(virt_addr address, span<const std::byte> data);
+        template <class T>
+        T read_memory_as(virt_addr address) const {
+            auto data = read_memory(address, sizeof(T));
+            return from_bytes<T>(data.data());
+        }
 
     private:
         pid_t pid_ = 0;
