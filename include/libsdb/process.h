@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <sys/types.h>
+#include <libsdb/bit.h>
 #include <libsdb/breakpoint_site.h>
 #include <libsdb/registers.h>
 #include <libsdb/stoppoint_collection.h>
