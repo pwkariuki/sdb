@@ -13,6 +13,7 @@
 #include <string_view>
 #include <sys/types.h>
 #include <vector>
+#include <libsdb/disassembler.h>
 #include <libsdb/error.h>
 #include <libsdb/parse.h>
 #include <libsdb/process.h>
@@ -76,17 +77,10 @@ namespace {
             std::cerr << R"(Available commands:
     breakpoint  - Commands for operating on breakpoints
     continue    - Resume the process
+    disassemble - Disassemble machine code to assembly
     memory      - Commands for operating on memory
     register    - Commands for operating on registers
     step        - Step over a single instruction
-)";
-        }
-        else if (is_prefix(args[1], "register")) {
-            std::cerr << R"(Available commands:
-    read
-    read <register>
-    read all
-    write <register> <value>
 )";
         }
         else if (is_prefix(args[1], "breakpoint")) {
@@ -98,6 +92,12 @@ namespace {
     set <address>
 )";
         }
+        else if (is_prefix(args[1], "disassemble")) {
+            std::cerr << R"(Available options:
+    -c <number of instructions>
+    -a <start address>
+)";
+        }
         else if (is_prefix(args[1], "memory")) {
             std::cerr << R"(Available commands:
     read <address>
@@ -105,8 +105,32 @@ namespace {
     write <address> <bytes>
 )";
         }
+        else if (is_prefix(args[1], "register")) {
+            std::cerr << R"(Available commands:
+     read
+     read <register>
+     read all
+     write <register> <value>
+ )";
+        }
         else {
             std::cerr << "No help available on that" << std::endl;
+        }
+    }
+
+    void print_disassembly(sdb::process& process,
+          sdb::virt_addr address, std::size_t n_instructions) {
+        sdb::disassembler dis(process);
+        auto instructions = dis.disassemble(n_instructions, address);
+        for (auto& instr : instructions) {
+            fmt::println("{:#018x}: {}", instr.address.addr(), instr.text);
+        }
+    }
+
+    void handle_stop(sdb::process& process, sdb::stop_reason reason) {
+        print_stop_reason(process, reason);
+        if (reason.reason == sdb::process_state::stopped) {
+            print_disassembly(process, process.get_pc(), 5);
         }
     }
 
@@ -324,6 +348,38 @@ namespace {
         }
     }
 
+    void handle_disassemble_command(sdb::process& process,
+        const std::vector<std::string> args) {
+        // Default disassemble parameters
+        auto address = process.get_pc();
+        std::size_t n_instructions = 5;
+
+        // Fill in address and n_instructions with user specifications
+        auto it = args.begin() + 1;
+        while (it != args.end()) {
+            if (*it == "-a" and it + 1 != args.end()) {
+                ++it;
+                auto opt_addr = sdb::to_integral<std::uint64_t>(*it++, 16);
+                if (!opt_addr) {
+                    sdb::error::send("Invalid address format");
+                }
+                address = sdb::virt_addr{ *opt_addr };
+            } else if (*it == "-c" and it + 1 != args.end()) {
+                ++it;
+                auto opt_n = sdb::to_integral<std::size_t>(*it++);
+                if (!opt_n) {
+                    sdb::error::send("Invalid instruction count");
+                }
+                n_instructions = *opt_n;
+            } else {
+                print_help({ "help", "disassemble" });
+                return;
+            }
+        }
+
+        print_disassembly(process, address, n_instructions);
+    }
+
     void handle_command(std::unique_ptr<sdb::process>& process,
         std::string_view line) {
         auto args = split(line, ' ');
@@ -332,7 +388,7 @@ namespace {
         if (is_prefix(command, "continue")) {
             process->resume();
             auto reason = process->wait_on_signal();
-            print_stop_reason(*process, reason);
+            handle_stop(*process, reason);
         } else if (is_prefix(command, "help")) {
             print_help(args);
         } else if (is_prefix(command, "register")) {
@@ -341,10 +397,12 @@ namespace {
             handle_breakpoint_command(*process, args);
         } else if (is_prefix(command, "step")) {
             auto reason = process->step_instruction();
-            print_stop_reason(*process, reason);
+            handle_stop(*process, reason);
         } else if (is_prefix(command, "memory")) {
             handle_memory_command(*process, args);
-        } else {
+        } else if (is_prefix(command, "disassemble")) {
+            handle_disassemble_command(*process, args);
+        }else {
             std::cerr << "Unknown command: " << command << std::endl;
         }
     }
