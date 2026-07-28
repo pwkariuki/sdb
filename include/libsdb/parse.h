@@ -5,6 +5,7 @@
 #ifndef SDB_PARSE_H
 #define SDB_PARSE_H
 
+#include <array>
 #include <charconv>
 #include <cstdint>
 #include <cstddef>
