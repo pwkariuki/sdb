@@ -81,11 +81,17 @@ namespace sdb {
             get_registers().write_by_id(register_id::rip, address.addr());
         }
 
-        breakpoint_site& create_breakpoint_site(virt_addr address);
+        // Breakpoint operations
+        breakpoint_site& create_breakpoint_site(
+            virt_addr address,
+            bool hardware = false,
+            bool internal = false);
         stoppoint_collection<breakpoint_site>& breakpoint_sites()
             { return breakpoint_sites_; }
         const stoppoint_collection<breakpoint_site>& breakpoint_sites() const
             { return breakpoint_sites_; }
+        int set_hardware_breakpoint(
+            breakpoint_site::id_type id, virt_addr address);void clear_hardwreare_stoppoint(int index);
 
         // Read and write memory operations
         std::vector<std::byte> read_memory(virt_addr address, std::size_t amount) const;
@@ -113,6 +119,9 @@ namespace sdb {
             is_attached_(is_attached),
             registers_(new registers(*this))
         {}
+
+        int set_hardware_stoppoint(
+            virt_addr address, stoppoint_mode mode, std::size_t size);
 
         void read_all_registers();
     };

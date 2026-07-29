@@ -14,6 +14,11 @@ namespace sdb {
 	using byte64 = std::array<std::byte, 8>;
 	using byte128 = std::array<std::byte, 16>;
 
+	// Condition to halt process on for hardware bereak/watchpoint
+	enum class stoppoint_mode {
+		write, read_write, execute
+	};
+
 	// Virtual address type e.g. program counter
 	class virt_addr {
 	public:

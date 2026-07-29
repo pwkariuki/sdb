@@ -27,6 +27,8 @@ namespace sdb {
 
         bool is_enabled() const { return is_enabled_; }
         virt_addr address() const { return address_; }
+        bool is_hardware() const { return is_hardware_; }
+        bool is_internal() const { return is_internal_; }
 
         bool at_address(virt_addr addr) const {
             return address_ == addr;
@@ -36,14 +38,19 @@ namespace sdb {
         }
 
     private:
-        breakpoint_site(process& proc, virt_addr address);
+        breakpoint_site(
+            process& proc, virt_addr address,
+            bool is_hardware = false, bool is_internal = false);
         friend process;
 
         id_type id_;           // unique breakpoint identifier
         process* process_;     // process that owns breakpoint
         virt_addr address_;    // breakpoint site virtual address
         bool is_enabled_;      // breakpoint site enabled/disabled flag
+        bool is_hardware_;     // hardware/software breakpoint flag
+        bool is_internal_;     // breakpoint for internal debugger use
         std::byte saved_data_; // data replaced with int3 to set breakpoint
+        int hardware_register_index_ = -1; // debug register index on hardware breakpoint
     };
 }
 
