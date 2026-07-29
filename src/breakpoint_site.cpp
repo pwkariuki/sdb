@@ -51,7 +51,7 @@ void sdb::breakpoint_site::disable() {
     if (!is_enabled_) return;
 
     if (is_hardware_) {
-        process_->clear_hardware_breakpoint(hardware_register_index_);
+        process_->clear_hardware_stoppoint(hardware_register_index_);
         hardware_register_index_ = -1;
     } else {
         errno = 0;

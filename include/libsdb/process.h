@@ -91,7 +91,8 @@ namespace sdb {
         const stoppoint_collection<breakpoint_site>& breakpoint_sites() const
             { return breakpoint_sites_; }
         int set_hardware_breakpoint(
-            breakpoint_site::id_type id, virt_addr address);void clear_hardwreare_stoppoint(int index);
+            breakpoint_site::id_type id, virt_addr address);
+        void clear_hardware_stoppoint(int index);
 
         // Read and write memory operations
         std::vector<std::byte> read_memory(virt_addr address, std::size_t amount) const;

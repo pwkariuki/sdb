@@ -241,7 +241,7 @@ int sdb::process::set_hardware_stoppoint(
     return free_space;
 }
 
-void sdb::process::clear_hardwreare_stoppoint(int index) {
+void sdb::process::clear_hardware_stoppoint(int index) {
     auto id = static_cast<int>(register_id::dr0) + index;
     get_registers().write_by_id(static_cast<register_id>(id), 0);
 
