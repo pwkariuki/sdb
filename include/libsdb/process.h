@@ -15,6 +15,7 @@
 #include <libsdb/registers.h>
 #include <libsdb/stoppoint_collection.h>
 #include <libsdb/types.h>
+#include <libsdb/watchpoint.h>
 
 namespace sdb {
     // Running state of the process
@@ -92,6 +93,17 @@ namespace sdb {
             { return breakpoint_sites_; }
         int set_hardware_breakpoint(
             breakpoint_site::id_type id, virt_addr address);
+        watchpoint& create_watchpoint(
+            virt_addr address, stoppoint_mode mode, std::size_t size);
+        int set_watchpoint(
+            watchpoint::id_type id, virt_addr address,
+            stoppoint_mode mode, std::size_t size);
+        stoppoint_collection<watchpoint>& watchpoints() {
+            return watchpoints_;
+        }
+        const stoppoint_collection<watchpoint>& watchpoints() const {
+            return watchpoints_;
+        }
         void clear_hardware_stoppoint(int index);
 
         // Read and write memory operations
@@ -112,6 +124,7 @@ namespace sdb {
         process_state state_ = process_state::stopped;
         std::unique_ptr<registers> registers_;
         stoppoint_collection<breakpoint_site> breakpoint_sites_;
+        stoppoint_collection<watchpoint> watchpoints_;
 
         // Constructor to be used by static members
         process(pid_t pid, bool terminate_on_end, bool is_attached) :
