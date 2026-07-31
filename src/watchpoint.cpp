@@ -2,6 +2,7 @@
 // Created by root on 7/29/26.
 //
 
+#include <utility>
 #include <libsdb/error.h>
 #include <libsdb/process.h>
 #include <libsdb/watchpoint.h>
@@ -22,6 +23,14 @@ sdb::watchpoint::watchpoint(
         error::send("Watchpoint must be aligned to size");
     }
     id_ = get_next_id();
+    update_data();
+}
+
+void sdb::watchpoint::update_data() {
+    std::uint64_t new_data = 0;
+    auto read = process_->read_memory(address_, size_);
+    memcpy(&new_data, read.data(), size_);
+    previous_data_ = std::exchange(data_, new_data);
 }
 
 void sdb::watchpoint::enable() {

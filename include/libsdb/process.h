@@ -26,12 +26,19 @@ namespace sdb {
         terminated,
     };
 
+    // Reason for a SIGTRAP to occur
+    enum class trap_type {
+        single_step, software_break,
+        hardware_break, unknown
+    };
+
     // Reason for a process to stop e.g. exited, terminated, or stopped
     struct stop_reason {
         stop_reason(int wait_status);
 
         process_state reason;
         std::uint8_t info;
+        std::optional<trap_type> trap_reason;
     };
 
     // Process Type
@@ -47,6 +54,9 @@ namespace sdb {
 
         // Step over machine instructions
         stop_reason step_instruction();
+
+        // Record trap reason when a stop occurs due to SIGTRAP
+        void augment_stop_reason(stop_reason& reason);
 
         // Disable default constructor and copy operations
         process() = delete;
@@ -93,6 +103,8 @@ namespace sdb {
             { return breakpoint_sites_; }
         int set_hardware_breakpoint(
             breakpoint_site::id_type id, virt_addr address);
+        std::variant<breakpoint_site::id_type, watchpoint::id_type>
+            get_current_hardware_stoppoint() const;
         watchpoint& create_watchpoint(
             virt_addr address, stoppoint_mode mode, std::size_t size);
         int set_watchpoint(
