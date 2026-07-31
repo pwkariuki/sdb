@@ -79,6 +79,10 @@ std::unique_ptr<sdb::process> sdb::process::launch(
 
     // In child process
     if (pid == 0) {
+        // Change inferior's process group for signal handling
+        if (setpgid(0, 0) < 0) {
+            exit_with_perror(channel, "Could not set pgid");
+        }
         personality(ADDR_NO_RANDOMIZE);
         channel.close_read();
 

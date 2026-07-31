@@ -3,6 +3,7 @@
 //
 
 #include <algorithm>
+#include <csignal>
 #include <editline/readline.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -19,6 +20,14 @@
 #include <libsdb/process.h>
 
 namespace {
+    // Current process
+    sdb::process* g_sdb_process = nullptr;
+
+    // SIGINT handler -- sends SIGSTOP to inferior
+    void handle_sigint(int) {
+        kill(g_sdb_process->pid(), SIGSTOP);
+    }
+
     std::unique_ptr<sdb::process> attach(int argc, const char **argv) {
         // Passing PID
         if (argc == 3 && argv[1] == std::string_view("-p")) {
@@ -553,6 +562,8 @@ int main(int argc, const char **argv) {
 
     try {
         auto process = attach(argc, argv);
+        g_sdb_process = process.get();
+        signal(SIGINT, handle_sigint); // install SIGINT handler
         main_loop(process);
     } catch (const sdb::error& err) {
         std::cout << err.what() << std::endl;
