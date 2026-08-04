@@ -5,6 +5,7 @@
 #ifndef SDB_PROCESS_H
 #define SDB_PROCESS_H
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -18,6 +19,46 @@
 #include <libsdb/watchpoint.h>
 
 namespace sdb {
+    // Syscall info for when inferior halts on entry and exit
+    struct syscall_information {
+        std::uint16_t id; // syscall number
+        bool entry;       // stop reason -- entry or exit
+        union {
+            std::array<std::uint16_t, 6> args; // for entry events
+            std::int64_t ret;                  // for exit events
+        };
+    };
+
+    // Track which syscalls we are tracing
+    class syscall_catch_policy {
+    public:
+        enum mode {
+            none, some, all
+        };
+
+        static syscall_catch_policy catch_all() {
+            return { all, {} };
+        }
+
+        static syscall_catch_policy catch_none() {
+            return { none, {} };
+        }
+
+        static syscall_catch_policy catch_some(std::vector<int> to_catch) {
+            return { some, std::move(to_catch) };
+        }
+
+        mode get_mode() const { return mode_; }
+        const std::vector<int>& get_to_catch() const { return to_catch_; }
+
+    private:
+        syscall_catch_policy(mode mode, std::vector<int> to_catch)
+            : mode_(mode), to_catch_(std::move(to_catch)) {}
+
+        mode mode_ = none;
+        std::vector<int> to_catch_;
+    };
+
     // Running state of the process
     enum class process_state {
         stopped,
@@ -29,7 +70,7 @@ namespace sdb {
     // Reason for a SIGTRAP to occur
     enum class trap_type {
         single_step, software_break,
-        hardware_break, unknown
+        hardware_break, syscall, unknown
     };
 
     // Reason for a process to stop e.g. exited, terminated, or stopped
@@ -39,6 +80,7 @@ namespace sdb {
         process_state reason;
         std::uint8_t info;
         std::optional<trap_type> trap_reason;
+        std::optional<syscall_information> syscall_info;
     };
 
     // Process Type
@@ -129,6 +171,11 @@ namespace sdb {
             return from_bytes<T>(data.data());
         }
 
+        // Syscalls tracing
+        void set_syscall_catch_policy(syscall_catch_policy info) {
+            syscall_catch_policy_ = std::move(info);
+        }
+
     private:
         pid_t pid_ = 0;
         bool terminate_on_end_ = true;
@@ -137,6 +184,9 @@ namespace sdb {
         std::unique_ptr<registers> registers_;
         stoppoint_collection<breakpoint_site> breakpoint_sites_;
         stoppoint_collection<watchpoint> watchpoints_;
+        syscall_catch_policy syscall_catch_policy_ =
+            syscall_catch_policy::catch_none();
+        bool expecting_syscall_exit_ = false;
 
         // Constructor to be used by static members
         process(pid_t pid, bool terminate_on_end, bool is_attached) :
@@ -150,6 +200,9 @@ namespace sdb {
             virt_addr address, stoppoint_mode mode, std::size_t size);
 
         void read_all_registers();
+
+        // May need to resume process if we are not tracing current syscall
+        stop_reason maybe_resume_from_syscall(const stop_reason& reason);
     };
 }
 

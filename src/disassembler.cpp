@@ -20,7 +20,7 @@ std::vector<sdb::disassembler::instruction> sdb::disassembler::disassemble(
     ZyanUSize offset = 0;
     ZydisDisassembledInstruction instr;
 
-    // Decode n_instructions or till we run out of in
+    // Decode n_instructions or till we run out of instruct
     while (ZYAN_SUCCESS(ZydisDisassembleATT(
         ZYDIS_MACHINE_MODE_LONG_64, address->addr(),
         code.data() + offset, code.size() - offset, & instr))
