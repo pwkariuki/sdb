@@ -12,6 +12,7 @@
 #include <libsdb/error.h>
 #include <libsdb/pipe.h>
 #include <libsdb/process.h>
+#include <libsdb/syscalls.h>
 
 using namespace sdb;
 
@@ -138,7 +139,7 @@ TEST_CASE("process::resume already terminated", "[process]") {
     REQUIRE_THROWS_AS(proc->resume(), error);
 }
 
-TEST_CASE("write register works", "[register]") {
+TEST_CASE("Write register works", "[register]") {
     bool close_on_exec = false;
     sdb::pipe channel(close_on_exec);
 
@@ -468,4 +469,11 @@ TEST_CASE("Watchpoint detects read", "[watchpoint]") {
     proc->wait_on_signal();
 
     REQUIRE(to_string_view(channel.read()) == "Putting pineapple on pizza...\n");
+}
+
+TEST_CASE("Syscall mapping works", "[syscall]") {
+    REQUIRE(sdb::syscall_id_to_name(0) == "read");
+    REQUIRE(sdb::syscall_name_to_id("read") == 0);
+    REQUIRE(sdb::syscall_id_to_name(62) == "kill");
+    REQUIRE(sdb::syscall_name_to_id("kill") == 62);
 }

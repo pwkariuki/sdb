@@ -14,7 +14,7 @@ namespace sdb {
 	using byte64 = std::array<std::byte, 8>;
 	using byte128 = std::array<std::byte, 16>;
 
-	// Condition to halt process on for hardware bereak/watchpoint
+	// Condition to halt process on for hardware break/watchpoint
 	enum class stoppoint_mode {
 		write, read_write, execute
 	};
