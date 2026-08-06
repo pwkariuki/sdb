@@ -209,15 +209,15 @@ void sdb::process::augment_stop_reason(stop_reason &reason) {
 
         if (expecting_syscall_exit_) {
             sys_info.entry = false;
-            sys_info.id = regs.read_by_id_as<std::uint16_t>(
-                register_id::orig_rax);
-            sys_info.ret = regs.read_by_id_as<std::uint16_t>(
-                register_id::rax);
+            sys_info.id = static_cast<uint16_t>(regs.read_by_id_as<std::uint64_t>(
+                register_id::orig_rax));
+            sys_info.ret = static_cast<int64_t>(regs.read_by_id_as<std::uint64_t>(
+                register_id::rax));
             expecting_syscall_exit_ = false;
         } else { // handle entry
             sys_info.entry = true;
-            sys_info.id = regs.read_by_id_as<uint16_t>(
-                register_id::orig_rax);
+            sys_info.id = static_cast<uint16_t>(regs.read_by_id_as<uint64_t>(
+                register_id::orig_rax));
 
             std::array<register_id, 6> arg_regs = {
                 register_id::rdi, register_id::rsi, register_id::rdx,

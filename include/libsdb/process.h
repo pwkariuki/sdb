@@ -24,7 +24,7 @@ namespace sdb {
         std::uint16_t id; // syscall number
         bool entry;       // stop reason -- entry or exit
         union {
-            std::array<std::uint16_t, 6> args; // for entry events
+            std::array<std::uint64_t, 6> args; // for entry events
             std::int64_t ret;                  // for exit events
         };
     };
