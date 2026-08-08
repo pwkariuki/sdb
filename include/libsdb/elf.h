@@ -7,6 +7,7 @@
 
 #include <elf.h>
 #include <filesystem>
+#include <vector>
 
 namespace sdb {
     // ELF files parser
@@ -27,6 +28,9 @@ namespace sdb {
         std::size_t file_size_;       // file size
         std::byte* data_;             // pointer to file bytes
         Elf64_Ehdr header_;           // header information
+        std::vector<Elf64_Shdr> section_headers_;
+
+        void parse_section_headers();
     };
 }
 
