@@ -1,6 +1,6 @@
 add_library(libsdb process.cpp pipe.cpp registers.cpp
         breakpoint_site.cpp disassembler.cpp watchpoint.cpp
-        syscalls.cpp)
+        syscalls.cpp elf.cpp)
 add_library(sdb::libsdb ALIAS libsdb)
 target_link_libraries(libsdb PRIVATE Zydis::Zydis)
 
