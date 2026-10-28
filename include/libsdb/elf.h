@@ -7,10 +7,16 @@
 
 #include <elf.h>
 #include <filesystem>
+#include <optional>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
+#include <libsdb/types.h>
 
 namespace sdb {
-    // ELF files parser
+    // ELF files parser. The debugger needs to parse ELF files relevant to
+    // the running process so it can retrieve debug information, locate the
+    // code for a given function, and more.
     class elf {
     public:
         elf(const std::filesystem::path& path);
@@ -22,15 +28,28 @@ namespace sdb {
         std::filesystem::path path() const { return path_; }
         const Elf64_Ehdr& get_header() const { return header_; }
 
+        // Retrieve section names from the section name string table
+        std::string_view get_section_name(std::size_t index) const;
+
+        // Retrieve section information by section name
+        std::optional<const Elf64_Shdr*> get_section(std::string_view name) const;
+        span<const std::byte> get_section_contents(std::string_view name) const;
+
+        // Retrieve a string from the general string table given an index
+        // in the `.strtab` or `.dynstr` section
+        std::string_view get_string(std::size_t index) const;
+
     private:
         int fd_;                      // open file descriptor
         std::filesystem::path path_;  // path to file
         std::size_t file_size_;       // file size
         std::byte* data_;             // pointer to file bytes
         Elf64_Ehdr header_;           // header information
-        std::vector<Elf64_Shdr> section_headers_;
+        std::vector<Elf64_Shdr> section_headers_; // section headers
+        std::unordered_map<std::string_view, Elf64_Shdr*> section_map_; // section names -> section headers
 
         void parse_section_headers();
+        void build_section_map();
     };
 }
 
