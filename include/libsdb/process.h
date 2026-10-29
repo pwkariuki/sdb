@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <unordered_map>
 #include <sys/types.h>
 #include <libsdb/bit.h>
 #include <libsdb/breakpoint_site.h>
@@ -175,6 +176,10 @@ namespace sdb {
         void set_syscall_catch_policy(syscall_catch_policy info) {
             syscall_catch_policy_ = std::move(info);
         }
+
+        // Map macro values, e.g. AT_ENTRY, to the value of the corresponding
+        // entry in the auxiliary vector
+        std::unordered_map<int, std::uint64_t> get_auxv() const;
 
     private:
         pid_t pid_ = 0;

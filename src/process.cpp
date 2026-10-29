@@ -2,6 +2,8 @@
 // Created by root on 3/7/26.
 //
 
+#include <elf.h>
+#include <fstream>
 #include <sys/personality.h>
 #include <sys/ptrace.h>
 #include <sys/types.h>
@@ -500,4 +502,22 @@ void sdb::process::write_memory(virt_addr address, span<const std::byte> data) {
         }
         written += 8;
     }
+}
+
+std::unordered_map<int, std::uint64_t> sdb::process::get_auxv() const {
+    auto path = "/proc/" + std::to_string(pid_) + "/auxv";
+    std::ifstream auxv(path);
+
+    std::unordered_map<int, std::uint64_t> ret;
+    std::uint64_t id, value;
+
+    auto read = [&](auto& into) {
+        auxv.read(reinterpret_cast<char*>(&into), sizeof(into));
+    };
+
+    for (read(id); id != AT_NULL; read(id)) {
+        read(value);
+        ret[id] = value;
+    }
+    return ret;
 }
