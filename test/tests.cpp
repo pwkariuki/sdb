@@ -14,6 +14,7 @@
 #include <libsdb/pipe.h>
 #include <libsdb/process.h>
 #include <libsdb/syscalls.h>
+#include <libsdb/target.h>
 
 using namespace sdb;
 
@@ -506,4 +507,22 @@ TEST_CASE("Syscall catchpoints work", "[catchpoint]") {
     REQUIRE(reason.syscall_info->entry == false);
 
     close(dev_null);
+}
+
+TEST_CASE("ELF parser works", "[elf]") {
+    auto path = "targets/hello_sdb";
+    elf elf(path);
+    auto entry = elf.get_header().e_entry;
+    auto sym = elf.get_symbol_at_address(file_addr{ elf, entry });
+    auto name = elf.get_string(sym.value()->st_name);
+    REQUIRE(name == "_start");
+
+    auto syms = elf.get_symbols_by_name("_start");
+    name = elf.get_string(syms.at(0)->st_name);
+    REQUIRE(name == "_start");
+
+    elf.notify_loaded(virt_addr{ 0xcafecafe });
+    sym = elf.get_symbol_at_address(virt_addr{ 0xcafecafe + entry });
+    name = elf.get_string(sym.value()->st_name);
+    REQUIRE(name == "_start");
 }
