@@ -11,7 +11,7 @@
 namespace sdb {
     class disassembler {
         // Instruction type holds a string representation of the instruction and
-        // the memory address where the corresponding binary instructio to is storedn is stored
+        // the memory address where the corresponding binary instruction is stored
         struct instruction {
             virt_addr address;
             std::string text;

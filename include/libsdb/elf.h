@@ -35,15 +35,28 @@ namespace sdb {
         std::optional<const Elf64_Shdr*> get_section(std::string_view name) const;
         span<const std::byte> get_section_contents(std::string_view name) const;
 
+        // Retrieve the start file address of a section by name
+        std::optional<file_addr> get_section_start_address(std::string_view name) const;
+
         // Retrieve a string from the general string table given an index
         // in the `.strtab` or `.dynstr` section
         std::string_view get_string(std::size_t index) const;
+
+        virt_addr load_bias() const { return load_bias_; }
+        void notify_loaded(virt_addr address) {
+            load_bias_ = address;
+        }
+
+        // Retrieve the section to which a given file or virtual address belongs
+        const Elf64_Shdr* get_section_containing_address(file_addr addr) const;
+        const Elf64_Shdr* get_section_containing_address(virt_addr addr) const;
 
     private:
         int fd_;                      // open file descriptor
         std::filesystem::path path_;  // path to file
         std::size_t file_size_;       // file size
         std::byte* data_;             // pointer to file bytes
+        virt_addr load_bias_;         // ELF load address for virtual address translation
         Elf64_Ehdr header_;           // header information
         std::vector<Elf64_Shdr> section_headers_; // section headers
         std::unordered_map<std::string_view, Elf64_Shdr*> section_map_; // section names -> section headers

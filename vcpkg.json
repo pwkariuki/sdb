@@ -1,3 +1,15 @@
 {
-  "dependencies": ["libedit", "catch2", "fmt", "zydis"]
+  "dependencies": [
+    "libedit",
+    "catch2",
+    "fmt",
+    "zydis"
+  ],
+  "builtin-baseline": "ab9a05e70421507222d83861ac1a31be7e4272d4",
+  "overrides": [
+    {
+      "name": "fmt",
+      "version": "11.0.2"
+    }
+  ]
 }
