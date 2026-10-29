@@ -2,6 +2,8 @@
 // Created by root on 8/8/26.
 //
 
+#include <algorithm>
+#include <cxxabi.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -34,6 +36,8 @@ sdb::elf::elf(const std::filesystem::path &path) {
     std::copy(data_, data_ + sizeof(header_), as_bytes(header_));
     parse_section_headers();
     build_section_map();
+    parse_symbol_table();
+    build_symbol_maps();
 }
 
 sdb::elf::~elf() {
@@ -100,6 +104,61 @@ const Elf64_Shdr * sdb::elf::get_section_containing_address(virt_addr addr) cons
     return nullptr;
 }
 
+std::vector<const Elf64_Sym *>
+sdb::elf::get_symbols_by_name(std::string_view name) const {
+    auto [begin, end] = symbol_name_map_.equal_range(name);
+    std::vector<const Elf64_Sym*> ret;
+    std::transform(begin, end, std::back_inserter(ret),
+        [](auto& pair) { return pair.second; });
+    return ret;
+}
+
+std::optional<const Elf64_Sym *>
+sdb::elf::get_symbol_at_address(file_addr addr) const {
+    if (addr.elf_file() != this) return std::nullopt;
+    file_addr null_addr;
+    auto it = symbol_addr_map_.find({ addr, null_addr });
+    if (it == symbol_addr_map_.end()) return std::nullopt;
+    return it->second;
+}
+
+std::optional<const Elf64_Sym *>
+sdb::elf::get_symbol_at_address(virt_addr addr) const {
+    return get_symbol_at_address(addr.to_file_addr(*this));
+}
+
+std::optional<const Elf64_Sym *>
+sdb::elf::get_symbol_containing_address(file_addr addr) const {
+    if (addr.elf_file() != this or symbol_addr_map_.empty()) {
+        return std::nullopt;
+    }
+
+    file_addr null_addr;
+    auto it = symbol_addr_map_.lower_bound({ addr, null_addr });
+
+    // Symbol containing given offset begins at this offset
+    if (it != symbol_addr_map_.end()) {
+        if (auto [key, value] = *it; key.first == addr) {
+            return value;
+        }
+    }
+
+    if (it == symbol_addr_map_.begin()) return std::nullopt;
+
+    --it;
+    // Range begins before the given address and spans beyond it
+    if (auto [key, value] = *it;
+        key.first < addr and key.second > addr) {
+        return value;
+    }
+
+    return std::nullopt;
+}
+
+std::optional<const Elf64_Sym *> sdb::elf::get_symbol_containing_address(virt_addr addr) const {
+    return get_symbol_containing_address(addr.to_file_addr(*this));
+}
+
 void sdb::elf::parse_section_headers() {
     auto n_headers = header_.e_shnum;
     // file specifies the number of headers to be 0 but also specifies section
@@ -118,5 +177,42 @@ void sdb::elf::parse_section_headers() {
 void sdb::elf::build_section_map() {
     for (auto& section : section_headers_) {
         section_map_[get_section_name(section.sh_name)] = &section;
+    }
+}
+
+void sdb::elf::parse_symbol_table() {
+    auto opt_symtab = get_section(".symtab");
+    if (!opt_symtab) {
+        opt_symtab = get_section(".dynsym");
+        if (!opt_symtab) return;
+    }
+
+    auto symtab = *opt_symtab;
+    symbol_table_.resize(symtab->sh_size / symtab->sh_entsize);
+    std::copy(data_ + symtab->sh_offset,
+        data_ + symtab->sh_offset + symtab->sh_size,
+        reinterpret_cast<std::byte*>(symbol_table_.data()));
+}
+
+void sdb::elf::build_symbol_maps() {
+    for (auto& symbol : symbol_table_) {
+        auto mangled_name = get_string(symbol.st_name);
+        int demangle_status;
+        auto demangled_name = abi::__cxa_demangle(
+            mangled_name.data(), nullptr, nullptr, &demangle_status);
+        if (demangle_status == 0) {
+            symbol_name_map_.insert({ demangled_name, &symbol });
+            free(demangled_name);
+        }
+        symbol_name_map_.insert({ mangled_name, &symbol });
+
+        if (symbol.st_value != 0 and
+            symbol.st_name != 0 and
+            ELF64_ST_TYPE(symbol.st_info) != STT_TLS) {
+            auto addr_range = std::pair(
+                file_addr{ *this, symbol.st_value },
+                file_addr{ *this, symbol.st_value + symbol.st_size });
+            symbol_addr_map_.insert({ addr_range, &symbol });
+        }
     }
 }
