@@ -37,7 +37,7 @@ namespace {
     // Find the section load bias for a given file address
     // from the output of the `readelf` tool
     std::int64_t get_section_load_bias(
-        std::filesystem::path path, Elf64_Addr file_address) {
+        const std::filesystem::path& path, const Elf64_Addr file_address) {
         auto command = std::string("readelf -WS ") + path.string();
         auto pipe = popen(command.c_str(), "r");
 
@@ -65,7 +65,7 @@ namespace {
     }
 
      // Retrieve the file offset of entry point of elf file
-     std::uint64_t get_entry_point_offset(std::filesystem::path path) {
+     std::uint64_t get_entry_point_offset(const std::filesystem::path& path) {
          std::ifstream elf_file(path);
 
          Elf64_Ehdr header;
