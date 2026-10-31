@@ -7,7 +7,6 @@
 #include <libsdb/dwarf.h>
 #include <libsdb/error.h>
 #include <libsdb/elf.h>
-#include <libsdb/types.h>
 
 namespace {
     // Points to a location in the DWARF information for parsing
@@ -85,6 +84,73 @@ namespace {
             return res;
         }
 
+        // DWARF form skipping
+        void skip_form(std::uint64_t form) {
+            switch (form) {
+                // Fixed-width forms
+                case DW_FORM_flag_present:
+                    break;
+
+                case DW_FORM_data1:
+                case DW_FORM_ref1:
+                case DW_FORM_flag:
+                    pos_ += 1; break;
+
+                case DW_FORM_data2:
+                case DW_FORM_ref2:
+                    pos_ += 2; break;
+
+                case DW_FORM_data4:
+                case DW_FORM_ref4:
+                case DW_FORM_ref_addr:
+                case DW_FORM_sec_offset:
+                case DW_FORM_strp:
+                    pos_ += 4; break;
+
+                case DW_FORM_data8:
+                case DW_FORM_addr:
+                    pos_ += 8; break;
+
+                // ULEB128 and SLED128 integer forms
+                case DW_FORM_sdata:
+                    sleb128(); break;
+                case DW_FORM_udata:
+                case DW_FORM_ref_udata:
+                    uleb128(); break;
+
+                // Explicitly sized forms
+                case DW_FORM_block1:
+                    pos_ += u8();
+                    break;
+                case DW_FORM_block2:
+                    pos_ += u16();
+                    break;
+                case DW_FORM_block4:
+                    pos_ += u32();
+                    break;
+                case DW_FORM_block:
+                case DW_FORM_exprloc:
+                    pos_ += uleb128();
+                    break;
+
+                // Strings (DW_FORM_string)
+                case DW_FORM_string:
+                    while (!is_finished() && *pos_ != std::byte(0)) {
+                        ++pos_;
+                    }
+                    ++pos_; // past null terminator
+                    break;
+
+                // Indirect forms (encoded as ULEB128 that gives it actual form)
+                case DW_FORM_indirect:
+                    skip_form(uleb128());
+                    break;
+
+                default:
+                    sdb::error::send("Unrecognized DWARF form");
+            }
+        }
+
     private:
         sdb::span<const std::byte> data_;
         const std::byte* pos_;
@@ -159,6 +225,32 @@ namespace {
 
         return units;
     }
+
+    sdb::die parse_die(const sdb::compile_unit& cu, cursor cur) {
+        auto pos = cur.position();
+        auto abbrev_code = cur.uleb128();
+
+        if (abbrev_code == 0) { // null DIE
+            auto next = cur.position();
+            return sdb::die{ next };
+        }
+
+        // Get abbreviation entry
+        auto& abbrev_table = cu.abbrev_table();
+        auto& abbrev = abbrev_table.at(abbrev_code);
+
+        // Find location of the next DIE and precompute the locations for
+        // each attribute of this DIE
+        std::vector<const std::byte*> attr_locs;
+        attr_locs.reserve(abbrev.attr_specs.size());
+        for (auto& attr : abbrev.attr_specs) {
+            attr_locs.push_back(cur.position());
+            cur.skip_form(attr.form);
+        }
+
+        auto next = cur.position();
+        return {pos, &cu, &abbrev, std::move(attr_locs), next};
+    }
 }
 
 sdb::dwarf::dwarf(const elf &parent) : elf_(&parent) {
@@ -176,4 +268,51 @@ sdb::dwarf::get_abbrev_table(std::size_t offset) {
 const std::unordered_map<std::uint64_t, sdb::abbrev> &
 sdb::compile_unit::abbrev_table() const {
     return parent_->get_abbrev_table(abbrev_offset_);
+}
+
+sdb::die sdb::compile_unit::root() const {
+    std::size_t header_size = 11;
+    cursor cur({ data_.begin() + header_size, data_.end() });
+    return parse_die(*this, cur);
+}
+
+sdb::die::children_range sdb::die::children() const {
+    return {*this};
+}
+
+sdb::die::children_range::iterator::iterator(const die &die) {
+    cursor next_cur({ die.next_, die.cu_->data().end() });
+    die_ = parse_die(*die.cu_, next_cur);
+}
+
+sdb::die::children_range::iterator &
+sdb::die::children_range::iterator::operator++() { // pre-increment
+    if (!die_.has_value() or !die_->abbrev_) return *this;
+
+    if (!die_->abbrev_->has_children) { // next DIE is next sibling
+        cursor next_cur({ die_->next_, die_->cu_->data().end() });
+        die_ = parse_die(*die_->cu_, next_cur);
+    } else { // next DIE after children entries is the next sibling
+        iterator sub_children(*die_);
+        while (sub_children->abbrev_) ++sub_children;
+        cursor next_cur({ sub_children->next_, die_->cu_->data().end() });
+        die_ = parse_die(*die_->cu_, next_cur);
+    }
+    return *this;
+}
+
+sdb::die::children_range::iterator
+sdb::die::children_range::iterator::operator++(int) { // post-increment
+    auto tmp = *this;
+    ++(*this);
+    return tmp;
+}
+
+bool sdb::die::children_range::iterator::operator==(const iterator& rhs) const {
+    auto lhs_null = !die_.has_value() or !die_->abbrev_entry();
+    auto rhs_null = !rhs.die_.has_value() or !rhs.die_->abbrev_entry();
+    if (lhs_null and rhs_null) return true;
+    if (lhs_null or rhs_null) return false;
+
+    return die_->abbrev_ == rhs->abbrev_ and die_->next() == rhs->next();
 }
