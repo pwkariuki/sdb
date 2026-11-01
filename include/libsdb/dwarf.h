@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <libsdb/detail/dwarf.h>
@@ -30,6 +31,34 @@ namespace sdb {
         std::uint64_t tag;
         bool has_children;
         std::vector<attr_spec> attr_specs;
+    };
+
+    // DIE attributes
+    class attr {
+    public:
+        attr(const compile_unit* cu, std::uint64_t type,
+            std::uint64_t form, const std::byte* location)
+                : cu_(cu), type_(type), form_(form), location_(location) {}
+
+        std::uint64_t name() const { return type_; }
+        std::uint64_t form() const { return form_; }
+
+        // Read a single 64-bit integer from the start of the attribute
+        file_addr as_address() const;
+        // Read section offset in 32-bit DWARF
+        std::uint32_t as_section_offset() const;
+        // Read block encoded as size followed by data
+        span<const std::byte> as_block() const;
+        // Check the form for the size of integer to parse
+        std::uint64_t as_int() const;
+        std::string_view as_string() const;
+        die as_reference() const;
+
+    private:
+        const compile_unit* cu_;
+        std::uint64_t type_;
+        std::uint64_t form_;
+        const std::byte* location_;
     };
 
     // Debugger's DWARF parser
@@ -95,6 +124,10 @@ namespace sdb {
         // Range type to iterate over children of DIEs
         class children_range;
         children_range children() const;
+
+        // Reading attributes by their identifiers
+        bool contains(std::uint64_t attribute) const;
+        attr operator[](std::uint64_t attribute) const;
 
     private:
         const std::byte* pos_ = nullptr;
