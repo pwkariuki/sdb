@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <libsdb/bit.h>
+#include <libsdb/dwarf.h>
 #include <libsdb/elf.h>
 #include <libsdb/error.h>
 
@@ -38,6 +39,8 @@ sdb::elf::elf(const std::filesystem::path &path) {
     build_section_map();
     parse_symbol_table();
     build_symbol_maps();
+
+    dwarf_ = std::make_unique<dwarf>(*this);
 }
 
 sdb::elf::~elf() {

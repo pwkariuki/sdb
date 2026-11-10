@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -143,6 +144,13 @@ namespace sdb {
             return compile_units_;
         }
 
+        // Retrieve the compile unit/function to which a file address belongs
+        const compile_unit* compile_unit_containing_address(file_addr address) const;
+        std::optional<die> function_containing_address(file_addr address) const;
+
+        // Retrieve the function DIEs for functions that match the name
+        std::vector<die> find_functions(std::string name) const;
+
     private:
         const elf* elf_;
         // Map offsets to the `.debug_abbrev` tables to another map,
@@ -150,6 +158,15 @@ namespace sdb {
         std::unordered_map<std::size_t,
             std::unordered_map<std::uint64_t, abbrev>> abbrev_tables_;
         std::vector<std::unique_ptr<compile_unit>> compile_units_;
+
+        void index() const; // index entire set of DIEs in dwarf object
+        void index_die(const die& current) const; // index a single DIE
+
+        struct index_entry {
+            const compile_unit* cu; // compile unit the function belongs
+            const std::byte* pos; // pointer to beginning of DIE
+        };
+        mutable std::unordered_multimap<std::string, index_entry> function_index_;
     };
 
     // Unit involved in the compilation of a program
@@ -202,6 +219,9 @@ namespace sdb {
 
         // Check whether file address lies within ranges of the DIE
         bool contains_address(file_addr address) const;
+
+        // Return the name of the DIE, if there is one
+        std::optional<std::string_view> name() const;
 
     private:
         const std::byte* pos_ = nullptr;
