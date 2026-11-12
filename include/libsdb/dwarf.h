@@ -6,6 +6,7 @@
 #define SDB_DWARF_H
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -169,15 +170,55 @@ namespace sdb {
         mutable std::unordered_multimap<std::string, index_entry> function_index_;
     };
 
+    // Maps source code line numbers to their corresponding machine instructions
+    class line_table {
+    public:
+        struct file {
+            std::filesystem::path path;
+            std::uint64_t modification_time;
+            std::uint64_t file_length;
+        };
+
+        line_table(span<const std::byte> data,
+            const compile_unit* cu,
+            bool default_is_stmt, std::int8_t line_base,
+            std::uint8_t line_range, std::uint8_t opcode_base,
+            std::vector<std::filesystem::path> include_directories,
+            std::vector<file> filenames)
+                : data_(data), cu_(cu), default_is_stmt_(default_is_stmt),
+                  line_base_(line_base), line_range_(line_range),
+                  opcode_base_(opcode_base),
+                  include_directories_(std::move(include_directories)),
+                  filenames_(std::move(filenames))
+        {}
+
+        // line_table values should be unique
+        line_table(const line_table&) = delete;
+        line_table& operator=(const line_table&) = delete;
+
+        const compile_unit& cu() const { return *cu_; }
+        const std::vector<file>& file_names() { return filenames_; }
+
+    private:
+        span<const std::byte> data_;
+        const compile_unit* cu_;
+        bool default_is_stmt_; // lines interpreted as start of source code stmts
+        std::int8_t line_base_; // min value opcodes can add to line register
+        std::uint8_t line_range_; // value range opcodes can add to line register
+        std::uint8_t opcode_base_; // number of first special opcode
+        std::vector<std::filesystem::path> include_directories_;
+        mutable std::vector<file> filenames_; // source files in compilation
+    };
+
     // Unit involved in the compilation of a program
     class compile_unit {
     public:
         compile_unit(dwarf& parent, span<const std::byte> data,
-            std::size_t abbrev_offset) : parent_(&parent), data_(data),
-                                         abbrev_offset_(abbrev_offset) {}
+            std::size_t abbrev_offset);
 
         const dwarf* dwarf_info() const { return parent_; }
         span<const std::byte> data() const { return data_; }
+        const line_table& lines() const { return *line_table_; }
 
         // Retrieve abbreviation table for the compile unit
         const std::unordered_map<std::uint64_t, abbrev>&  abbrev_table() const;
@@ -189,6 +230,7 @@ namespace sdb {
         dwarf* parent_;
         span<const std::byte> data_; // unit's data in `.debug_info` section
         std::size_t abbrev_offset_; // unit's offset to the abbreviation table
+        std::unique_ptr<line_table> line_table_; // line table
     };
 
     // Debugging Information Entry
