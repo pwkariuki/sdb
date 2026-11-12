@@ -150,7 +150,7 @@ namespace sdb {
         std::optional<die> function_containing_address(file_addr address) const;
 
         // Retrieve the function DIEs for functions that match the name
-        std::vector<die> find_functions(std::string name) const;
+        std::vector<die> find_functions(const std::string& name) const;
 
     private:
         const elf* elf_;
@@ -179,6 +179,8 @@ namespace sdb {
             std::uint64_t file_length;
         };
 
+        struct entry;
+
         line_table(span<const std::byte> data,
             const compile_unit* cu,
             bool default_is_stmt, std::int8_t line_base,
@@ -199,6 +201,10 @@ namespace sdb {
         const compile_unit& cu() const { return *cu_; }
         const std::vector<file>& file_names() { return filenames_; }
 
+        class iterator;
+        iterator begin() const;
+        iterator end() const;
+
     private:
         span<const std::byte> data_;
         const compile_unit* cu_;
@@ -209,6 +215,61 @@ namespace sdb {
         std::vector<std::filesystem::path> include_directories_;
         mutable std::vector<file> filenames_; // source files in compilation
     };
+
+    // Line table entry with line table's abstract machine registers
+    struct line_table::entry {
+        file_addr address; // program counter value
+        std::uint64_t file_index = 1; // index of operation within VLIW instruction
+        std::uint64_t line = 1; // source line number
+        std::uint64_t column = 0; // column number within source line
+        bool is_stmt; // beginning of statement
+        bool basic_block_start = false; // beginning of block without branches
+        bool end_sequence = false; // sequence of instructions end
+        bool prologue_end = false; // end of function prologue
+        bool epilogue_begin = false; // start of function epilogue
+        std::uint64_t discriminator = 0; // for performance profilers
+        file* file_entry = nullptr; // actual file data for this entry
+
+        bool operator==(const entry& rhs) const {
+            return address == rhs.address and
+                file_index == rhs.file_index and
+                line == rhs.line and
+                column == rhs.column and
+                discriminator == rhs.discriminator;
+        }
+    };
+
+    class line_table::iterator {
+    public:
+        using value_type = entry;
+        using pointer = const entry*;
+        using reference = const entry&;
+        using difference_type = std::ptrdiff_t;
+        using iterator_category = std::forward_iterator_tag;
+
+        iterator(const line_table* table);
+
+        iterator() = default;
+        iterator(const iterator&) = default;
+        iterator& operator=(const iterator&) = default;
+
+        const entry& operator*() const { return current_; }
+        const entry* operator->() const { return &current_; }
+
+        bool operator==(const iterator& rhs) const { return pos_ == rhs.pos_; }
+        bool operator!=(const iterator& rhs) const { return pos_ != rhs.pos_; }
+
+        iterator& operator++();
+        iterator operator++(int);
+
+    private:
+        const line_table* table_;
+        entry current_;
+        entry registers_;
+        const std::byte* pos_;
+    };
+
+
 
     // Unit involved in the compilation of a program
     class compile_unit {

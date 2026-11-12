@@ -301,7 +301,7 @@ namespace {
         }
 
         auto default_is_stmt = cur.u8();
-        auto line_base = cur.u8();
+        auto line_base = cur.s8();
         auto line_range = cur.u8();
         auto opcode_base = cur.u8();
 
@@ -578,7 +578,7 @@ sdb::dwarf::function_containing_address(file_addr address) const {
     return std::nullopt;
 }
 
-std::vector<sdb::die> sdb::dwarf::find_functions(std::string name) const {
+std::vector<sdb::die> sdb::dwarf::find_functions(const std::string& name) const {
     index();
 
     std::vector<die> found;
@@ -614,9 +614,29 @@ void sdb::dwarf::index_die(const die &current) const {
     }
 }
 
+sdb::line_table::iterator sdb::line_table::begin() const {
+    return {this};
+}
+
+sdb::line_table::iterator sdb::line_table::end() const {
+    return {};
+}
+
+sdb::line_table::iterator::iterator(const line_table *table)
+    : table_(table), pos_(table->data_.begin()) {
+    registers_.is_stmt = table->default_is_stmt_;
+    ++(*this);
+}
+
+sdb::line_table::iterator & sdb::line_table::iterator::operator++() {
+}
+
+sdb::line_table::iterator sdb::line_table::iterator::operator++(int) {
+}
+
 sdb::compile_unit::compile_unit(dwarf &parent, span<const std::byte> data,
-        std::size_t abbrev_offset) : parent_(&parent), data_(data),
-        abbrev_offset_(abbrev_offset) {
+                                std::size_t abbrev_offset) : parent_(&parent), data_(data),
+                                                             abbrev_offset_(abbrev_offset) {
     line_table_ = parse_line_table(*this);
 }
 
@@ -671,7 +691,6 @@ sdb::file_addr sdb::die::high_pc() const {
     }
     if (contains(DW_AT_high_pc)) {
         auto attr = (*this)[DW_AT_high_pc];
-        file_addr addr;
         if (attr.form() == DW_FORM_addr) {
             return attr.as_address();
         }
