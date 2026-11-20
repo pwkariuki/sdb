@@ -191,7 +191,7 @@ namespace sdb {
                   line_base_(line_base), line_range_(line_range),
                   opcode_base_(opcode_base),
                   include_directories_(std::move(include_directories)),
-                  filenames_(std::move(filenames))
+                  file_names_(std::move(filenames))
         {}
 
         // line_table values should be unique
@@ -199,7 +199,7 @@ namespace sdb {
         line_table& operator=(const line_table&) = delete;
 
         const compile_unit& cu() const { return *cu_; }
-        const std::vector<file>& file_names() { return filenames_; }
+        const std::vector<file>& file_names() { return file_names_; }
 
         class iterator;
         iterator begin() const;
@@ -213,7 +213,7 @@ namespace sdb {
         std::uint8_t line_range_; // value range opcodes can add to line register
         std::uint8_t opcode_base_; // number of first special opcode
         std::vector<std::filesystem::path> include_directories_;
-        mutable std::vector<file> filenames_; // source files in compilation
+        mutable std::vector<file> file_names_; // source files in compilation
     };
 
     // Line table entry with line table's abstract machine registers
@@ -267,6 +267,10 @@ namespace sdb {
         entry current_;
         entry registers_;
         const std::byte* pos_;
+
+        // Execute single line table program instruction and return indication
+        // of whether that instruction should emit a new matrix row
+        bool execute_instruction();
     };
 
 
