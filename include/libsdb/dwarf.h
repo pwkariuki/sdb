@@ -205,6 +205,12 @@ namespace sdb {
         iterator begin() const;
         iterator end() const;
 
+        // find line table entries that correspond to source code line or
+        // program counter for source-level stepping and breakpoints
+        iterator get_entry_by_address(file_addr address) const;
+        std::vector<iterator> get_entries_by_line(
+            const std::filesystem::path& path, std::size_t line) const;
+
     private:
         span<const std::byte> data_;
         const compile_unit* cu_;

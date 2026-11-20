@@ -341,6 +341,15 @@ namespace {
             line_base, line_range, opcode_base, std::move(include_directories),
             std::move(file_names));
     }
+
+    bool path_ends_in(const std::filesystem::path& lhs,
+                      const std::filesystem::path& rhs) {
+        auto lhs_size = std::distance(lhs.begin(), lhs.end());
+        auto rhs_size = std::distance(rhs.begin(), rhs.end());
+        if (rhs_size > lhs_size) return false;
+        auto start = std::next(lhs.begin(), lhs_size - rhs_size);
+        return std::equal(start, lhs.end(), rhs.begin());
+    }
 }
 
 sdb::range_list::iterator sdb::range_list::begin() const {
@@ -620,6 +629,39 @@ sdb::line_table::iterator sdb::line_table::begin() const {
 
 sdb::line_table::iterator sdb::line_table::end() const {
     return {};
+}
+
+sdb::line_table::iterator
+sdb::line_table::get_entry_by_address(file_addr address) const {
+    auto prev = begin();
+    if (prev == end()) return prev;
+
+    auto it = prev;
+    for (++it; it != end(); prev = it++) {
+        if (prev->address <= address and it->address > address and
+            !prev->end_sequence) {
+            return prev;
+        }
+    }
+    return end();
+}
+
+std::vector<sdb::line_table::iterator>
+sdb::line_table::get_entries_by_line(
+        const std::filesystem::path& path, std::size_t line) const {
+    std::vector<iterator> entries;
+
+    for (auto it = begin(); it != end(); ++it) {
+        auto& entry_path = it->file_entry->path;
+        if (it->line == line) {
+            if ((path.is_absolute() and entry_path == path) or
+                (path.is_relative() and path_ends_in(entry_path, path))) {
+                entries.push_back(it);
+            }
+        }
+    }
+
+    return entries;
 }
 
 sdb::line_table::iterator::iterator(const line_table *table)
