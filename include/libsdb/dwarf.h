@@ -17,9 +17,10 @@
 #include <libsdb/types.h>
 
 namespace sdb {
-    class elf;
     class compile_unit;
     class die;
+    class dwarf;
+    class elf;
 
     // Type to store the values held in an abbreviation table entry:
     // an abbreviation code, a tag, a flag indicating if the DIE has children,
@@ -130,46 +131,6 @@ namespace sdb {
         const std::byte* location_;
     };
 
-    // Debugger's DWARF parser
-    class dwarf {
-    public:
-        dwarf(const elf& parent);
-        const elf* elf_file() const { return elf_; }
-
-        // Parse each abbreviation table when it's first requested
-        // and cache for future lookups
-        const std::unordered_map<std::uint64_t, abbrev>& get_abbrev_table(
-            std::size_t offset);
-
-        const std::vector<std::unique_ptr<compile_unit>>& compile_units() const {
-            return compile_units_;
-        }
-
-        // Retrieve the compile unit/function to which a file address belongs
-        const compile_unit* compile_unit_containing_address(file_addr address) const;
-        std::optional<die> function_containing_address(file_addr address) const;
-
-        // Retrieve the function DIEs for functions that match the name
-        std::vector<die> find_functions(const std::string& name) const;
-
-    private:
-        const elf* elf_;
-        // Map offsets to the `.debug_abbrev` tables to another map,
-        // of integers to abbreviation entries
-        std::unordered_map<std::size_t,
-            std::unordered_map<std::uint64_t, abbrev>> abbrev_tables_;
-        std::vector<std::unique_ptr<compile_unit>> compile_units_;
-
-        void index() const; // index entire set of DIEs in dwarf object
-        void index_die(const die& current) const; // index a single DIE
-
-        struct index_entry {
-            const compile_unit* cu; // compile unit the function belongs
-            const std::byte* pos; // pointer to beginning of DIE
-        };
-        mutable std::unordered_multimap<std::string, index_entry> function_index_;
-    };
-
     // Maps source code line numbers to their corresponding machine instructions
     class line_table {
     public:
@@ -199,7 +160,7 @@ namespace sdb {
         line_table& operator=(const line_table&) = delete;
 
         const compile_unit& cu() const { return *cu_; }
-        const std::vector<file>& file_names() { return file_names_; }
+        std::vector<file>& file_names() { return file_names_; }
 
         class iterator;
         iterator begin() const;
@@ -279,8 +240,6 @@ namespace sdb {
         bool execute_instruction();
     };
 
-
-
     // Unit involved in the compilation of a program
     class compile_unit {
     public:
@@ -289,7 +248,7 @@ namespace sdb {
 
         const dwarf* dwarf_info() const { return parent_; }
         span<const std::byte> data() const { return data_; }
-        const line_table& lines() const { return *line_table_; }
+        line_table& lines() const { return *line_table_; }
 
         // Retrieve abbreviation table for the compile unit
         const std::unordered_map<std::uint64_t, abbrev>&  abbrev_table() const;
@@ -302,6 +261,59 @@ namespace sdb {
         span<const std::byte> data_; // unit's data in `.debug_info` section
         std::size_t abbrev_offset_; // unit's offset to the abbreviation table
         std::unique_ptr<line_table> line_table_; // line table
+    };
+
+    // Debugger's DWARF parser
+    class dwarf {
+    public:
+        dwarf(const elf& parent);
+        const elf* elf_file() const { return elf_; }
+
+        // Parse each abbreviation table when it's first requested
+        // and cache for future lookups
+        const std::unordered_map<std::uint64_t, abbrev>& get_abbrev_table(
+            std::size_t offset);
+
+        const std::vector<std::unique_ptr<compile_unit>>& compile_units() const {
+            return compile_units_;
+        }
+
+        // Retrieve the compile unit/function to which a file address belongs
+        const compile_unit* compile_unit_containing_address(file_addr address) const;
+        std::optional<die> function_containing_address(file_addr address) const;
+
+        // Retrieve the function DIEs for functions that match the name
+        std::vector<die> find_functions(const std::string& name) const;
+
+        // Retrieve line entry corresponding to file address
+        line_table::iterator line_entry_at_address(file_addr address) const {
+            auto cu = compile_unit_containing_address(address);
+            if (!cu) return {};
+            return cu->lines().get_entry_by_address(address);
+        }
+
+    private:
+        const elf* elf_;
+        // Map offsets to the `.debug_abbrev` tables to another map,
+        // of integers to abbreviation entries
+        std::unordered_map<std::size_t,
+            std::unordered_map<std::uint64_t, abbrev>> abbrev_tables_;
+        std::vector<std::unique_ptr<compile_unit>> compile_units_;
+
+        void index() const; // index entire set of DIEs in dwarf object
+        void index_die(const die& current) const; // index a single DIE
+
+        struct index_entry {
+            const compile_unit* cu; // compile unit the function belongs
+            const std::byte* pos; // pointer to beginning of DIE
+        };
+        mutable std::unordered_multimap<std::string, index_entry> function_index_;
+    };
+
+    // For DIEs that may contain file and line information
+    struct source_location {
+        const line_table::file* file;
+        std::uint64_t line;
     };
 
     // Debugging Information Entry
@@ -335,6 +347,11 @@ namespace sdb {
 
         // Return the name of the DIE, if there is one
         std::optional<std::string_view> name() const;
+
+        // Line attribute helpers
+        source_location location() const;
+        const line_table::file& file() const;
+        std::uint64_t line() const;
 
     private:
         const std::byte* pos_ = nullptr;

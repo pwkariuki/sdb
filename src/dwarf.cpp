@@ -535,6 +535,27 @@ std::optional<std::string_view> sdb::die::name() const {
     return std::nullopt;
 }
 
+sdb::source_location sdb::die::location() const {
+    return { &file(), line() };
+}
+
+const sdb::line_table::file & sdb::die::file() const {
+    std::uint64_t idx;
+    if (abbrev_->tag == DW_TAG_inlined_subroutine) {
+        idx = (*this)[DW_AT_call_file].as_int();
+    } else {
+        idx = (*this)[DW_AT_decl_file].as_int();
+    }
+    return this->cu_->lines().file_names()[idx-1];
+}
+
+std::uint64_t sdb::die::line() const {
+    if (abbrev_->tag == DW_TAG_inlined_subroutine) {
+        return (*this)[DW_AT_call_line].as_int();
+    }
+    return (*this)[DW_AT_decl_line].as_int();
+}
+
 std::string_view sdb::attr::as_string() const {
     cursor cur({ location_, cu_->data().end() });
     switch (form_) {
