@@ -621,6 +621,27 @@ std::vector<sdb::die> sdb::dwarf::find_functions(const std::string& name) const 
     return found;
 }
 
+std::vector<sdb::die> sdb::dwarf::inline_stack_at_address(file_addr address) const {
+    auto func = function_containing_address(address);
+    std::vector<die> stack;
+    if (func) {
+        stack.push_back(*func);
+        while (true) {
+            const auto& children = stack.back().children();
+            auto found = std::find_if(children.begin(), children.end(),
+                [=](auto& child) {
+                    return child.abbrev_entry()->tag == DW_TAG_inlined_subroutine and
+                        child.contains_address(address);
+                });
+            if (found == children.end()) {
+                break;
+            }
+            stack.push_back(*found);
+        }
+    }
+    return stack;
+}
+
 void sdb::dwarf::index() const {
     if (!function_index_.empty()) return;
     for (auto& cu : compile_units_) {
@@ -812,8 +833,8 @@ bool sdb::line_table::iterator::execute_instruction() {
 }
 
 sdb::compile_unit::compile_unit(dwarf &parent, span<const std::byte> data,
-                                std::size_t abbrev_offset) : parent_(&parent), data_(data),
-                                                             abbrev_offset_(abbrev_offset) {
+    std::size_t abbrev_offset) : parent_(&parent), data_(data),
+                                 abbrev_offset_(abbrev_offset) {
     line_table_ = parse_line_table(*this);
 }
 

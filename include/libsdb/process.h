@@ -20,6 +20,8 @@
 #include <libsdb/watchpoint.h>
 
 namespace sdb {
+    class target;
+
     // Syscall info for when inferior halts on entry and exit
     struct syscall_information {
         std::uint16_t id; // syscall number
@@ -181,6 +183,8 @@ namespace sdb {
         // entry in the auxiliary vector
         std::unordered_map<int, std::uint64_t> get_auxv() const;
 
+        void set_target(target* tgt) { target_ = tgt; }
+
     private:
         pid_t pid_ = 0;
         bool terminate_on_end_ = true;
@@ -192,6 +196,7 @@ namespace sdb {
         syscall_catch_policy syscall_catch_policy_ =
             syscall_catch_policy::catch_none();
         bool expecting_syscall_exit_ = false;
+        target* target_ = nullptr; // inline stack tracking
 
         // Constructor to be used by static members
         process(pid_t pid, bool terminate_on_end, bool is_attached) :

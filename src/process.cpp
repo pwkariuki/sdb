@@ -14,6 +14,7 @@
 #include <libsdb/error.h>
 #include <libsdb/pipe.h>
 #include <libsdb/process.h>
+#include <libsdb/target.h>
 
 namespace {
     // Write errors in child process to parent process using pipe
@@ -174,6 +175,7 @@ sdb::stop_reason sdb::process::wait_on_signal() {
                 reason = maybe_resume_from_syscall(reason);
             }
         }
+        if (target_) target_->notify_stop(reason);
     }
 
     return reason;

@@ -8,6 +8,7 @@
 #include <memory>
 #include <libsdb/elf.h>
 #include <libsdb/process.h>
+#include <libsdb/stack.h>
 
 namespace sdb {
     // Manage the symbolic level of the program being debugged e.g. carrying out
@@ -19,7 +20,7 @@ namespace sdb {
         target& operator=(const target&) = delete;
 
         static std::unique_ptr<target> launch(
-            std::filesystem::path path,
+            const std::filesystem::path& path,
             std::optional<int> stdout_replacement = std::nullopt);
         static std::unique_ptr<target> attach(pid_t pid);
 
@@ -28,12 +29,21 @@ namespace sdb {
         elf& get_elf() { return *elf_; }
         const elf& get_elf() const { return *elf_; }
 
+        void notify_stop(const stop_reason& reason);
+
+        // Convert program counter from virtual address to file address
+        file_addr get_pc_file_address() const;
+
+        stack& get_stack() { return stack_; }
+        const stack& get_stack() const { return stack_; }
+
     private:
         target(std::unique_ptr<process> proc, std::unique_ptr<elf> obj)
-            : process_(std::move(proc)), elf_(std::move(obj)) {}
+            : process_(std::move(proc)), elf_(std::move(obj)), stack_(this) {}
 
         std::unique_ptr<process> process_;
         std::unique_ptr<elf> elf_;
+        stack stack_;
     };
 }
 

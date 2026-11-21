@@ -292,6 +292,9 @@ namespace sdb {
             return cu->lines().get_entry_by_address(address);
         }
 
+        // Return list of DIEs representing the inline function stack at address
+        std::vector<die> inline_stack_at_address(file_addr address) const;
+
     private:
         const elf* elf_;
         // Map offsets to the `.debug_abbrev` tables to another map,
