@@ -157,9 +157,12 @@ namespace {
     catchpoint  - Commands for operating on catchpoints
     continue    - Resume the process
     disassemble - Disassemble machine code to assembly
+    finish      - Step-out
     memory      - Commands for operating on memory
+    next        - Step-over
     register    - Commands for operating on registers
-    step        - Step over a single instruction
+    step        - Step-in
+    stepi       - Single instruction step
     watchpoint  - Commands for operating on watchpoints
 )";
         }
@@ -625,7 +628,7 @@ namespace {
             handle_register_command(*process, args);
         } else if (is_prefix(command, "breakpoint")) {
             handle_breakpoint_command(*process, args);
-        } else if (is_prefix(command, "step")) {
+        } else if (is_prefix(command, "stepi")) {
             auto reason = process->step_instruction();
             handle_stop(*target, reason);
         } else if (is_prefix(command, "memory")) {
@@ -636,6 +639,15 @@ namespace {
             handle_watchpoint_command(*process, args);
         } else if (is_prefix(command, "catchpoint")) {
             handle_catchpoint_command(*process, args);
+        } else if (is_prefix(command, "next")) {
+            auto reason = target->step_over();
+            handle_stop(*target, reason);
+        } else if (is_prefix(command, "finish")) {
+            auto reason = target->step_out();
+            handle_stop(*target, reason);
+        } else if (is_prefix(command, "step")) {
+            auto reason = target->step_in();
+            handle_stop(*target, reason);
         } else {
             std::cerr << "Unknown command: " << command << std::endl;
         }

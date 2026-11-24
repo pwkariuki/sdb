@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <libsdb/elf.h>
+#include <libsdb/dwarf.h>
 #include <libsdb/process.h>
 #include <libsdb/stack.h>
 
@@ -36,6 +37,14 @@ namespace sdb {
 
         stack& get_stack() { return stack_; }
         const stack& get_stack() const { return stack_; }
+
+        // Source-level stepping
+        stop_reason step_in();
+        stop_reason step_out();
+        stop_reason step_over();
+
+        line_table::iterator line_entry_at_pc() const;
+        stop_reason run_until_address(virt_addr address);
 
     private:
         target(std::unique_ptr<process> proc, std::unique_ptr<elf> obj)
