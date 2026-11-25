@@ -1,7 +1,8 @@
 add_library(libsdb process.cpp pipe.cpp registers.cpp
         breakpoint_site.cpp disassembler.cpp watchpoint.cpp
         syscalls.cpp elf.cpp types.cpp target.cpp dwarf.cpp
-        stack.cpp)
+        stack.cpp
+        breakpoint.cpp)
 add_library(sdb::libsdb ALIAS libsdb)
 target_link_libraries(libsdb PRIVATE Zydis::Zydis)
 

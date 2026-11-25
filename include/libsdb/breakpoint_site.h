@@ -10,6 +10,7 @@
 #include <libsdb/types.h>
 
 namespace sdb {
+    class breakpoint;
     class process;
 
     // Physical, hardware-level breakpoint
@@ -43,6 +44,11 @@ namespace sdb {
             bool is_hardware = false, bool is_internal = false);
         friend process;
 
+        breakpoint_site(
+            breakpoint* parent, id_type id,
+            process& proc, virt_addr address,
+            bool is_hardware = false, bool is_internal = false);
+
         id_type id_;           // unique breakpoint identifier
         process* process_;     // process that owns breakpoint
         virt_addr address_;    // breakpoint site virtual address
@@ -51,6 +57,7 @@ namespace sdb {
         bool is_internal_;     // breakpoint for internal debugger use
         std::byte saved_data_; // data replaced with int3 to set breakpoint
         int hardware_register_index_ = -1; // debug register index on hardware breakpoint
+        breakpoint* parent_ = nullptr; // breakpoint it belongs to
     };
 }
 

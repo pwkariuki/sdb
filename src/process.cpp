@@ -409,6 +409,19 @@ sdb::breakpoint_site& sdb::process::create_breakpoint_site(
             *this, address, hardware, internal)));
 }
 
+sdb::breakpoint_site & sdb::process::create_breakpoint_site(breakpoint *parent,
+        breakpoint_site::id_type id, virt_addr address,
+        bool hardware, bool internal) {
+    if (breakpoint_sites_.contains_address(address)) {
+        error::send("Breakpoint site already created at address " +
+            std::to_string(address.addr()));
+    }
+    return breakpoint_sites_.push(
+        std::unique_ptr<breakpoint_site>(
+            new breakpoint_site(
+                parent, id, *this, address, hardware, internal)));
+}
+
 int sdb::process::set_hardware_breakpoint(
     breakpoint_site::id_type id, virt_addr address) {
     return set_hardware_stoppoint(address, stoppoint_mode::execute, 1);

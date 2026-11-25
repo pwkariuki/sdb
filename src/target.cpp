@@ -4,6 +4,7 @@
 
 #include <csignal>
 #include <optional>
+#include <utility>
 #include <libsdb/bit.h>
 #include <libsdb/disassembler.h>
 #include <libsdb/target.h>
@@ -173,4 +174,49 @@ sdb::stop_reason sdb::target::run_until_address(virt_addr address) {
     }
 
     return reason;
+}
+
+sdb::target::find_functions_result
+sdb::target::find_functions(std::string name) const {
+    find_functions_result result;
+
+    auto dwarf_found = elf_->get_dwarf().find_functions(name);
+    if (dwarf_found.empty()) {
+        auto elf_found = elf_->get_symbols_by_name(name);
+        for (auto sym : elf_found) {
+            result.elf_functions.emplace_back(std::pair{ elf_.get(), sym });
+        }
+    } else {
+        result.dwarf_functions.insert(
+            result.dwarf_functions.end(),
+            dwarf_found.begin(), dwarf_found.end());
+    }
+
+    return result;
+}
+
+sdb::breakpoint &
+sdb::target::create_address_breakpoint(virt_addr address,
+        bool hardware, bool internal) {
+    return breakpoints_.push(
+        std::unique_ptr<address_breakpoint>(
+            new address_breakpoint(
+                *this, address, hardware, internal)));
+}
+
+sdb::breakpoint &
+sdb::target::create_function_breakpoint(std::string function_name,
+        bool hardware, bool internal) {
+    return breakpoints_.push(
+        std::unique_ptr<function_breakpoint>(
+            new function_breakpoint(
+                *this, std::move(function_name), hardware, internal)));
+}
+
+sdb::breakpoint & sdb::target::create_line_breakpoint(std::filesystem::path file,
+        std::size_t line, bool hardware, bool internal) {
+    return breakpoints_.push(
+        std::unique_ptr<line_breakpoint>(
+            new line_breakpoint(
+                *this, std::move(file), line, hardware, internal)));
 }

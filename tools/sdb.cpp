@@ -330,7 +330,104 @@ namespace {
         }
     }
 
-    void handle_breakpoint_command(sdb::process& process,
+    void handle_breakpoint_list_command(sdb::target& target) {
+        if (target.breakpoints().empty()) {
+            fmt::println("No breakpoints set");
+        } else {
+            fmt::println("Current breakpoints:");
+            target.breakpoints().for_each([](auto& bp) {
+                if (bp.is_internal()) return;
+                fmt::print("{}: ", bp.id());
+                if (auto func_bp = dynamic_cast<sdb::function_breakpoint*>(&bp)) {
+                    fmt::print("function = {}", func_bp->function_name());
+                } else if (auto line_bp = dynamic_cast<sdb::line_breakpoint*>(&bp)) {
+                    fmt::print("file = {}, line = {}",
+                        line_bp->file().string(), line_bp->line());
+                } else if (auto addr_bp = dynamic_cast<sdb::address_breakpoint*>(&bp)) {
+                    fmt::print("address = {:#x}", addr_bp->address().addr());
+                }
+                fmt::println(", {}:", bp.is_enabled() ? "enabled" : "disabled");
+                bp.breakpoint_sites().for_each([&](auto& site) {
+                    fmt::println("    .{}: address = {:#x}, {}",
+                        site.id(), site.address().addr(),
+                        site.is_enabled() ? "enabled" : "disabled");
+                });
+            });
+        }
+    }
+
+    void handle_breakpoint_set_command(sdb::target& target,
+            const std::vector<std::string>& args) {
+        bool hardware = false;
+        if (args.size() == 4) {
+            if (args[3] == "-h") hardware = true;
+            else sdb::error::send("Invalid breakpoint command argument");
+        }
+
+        if (args[2].find("0x") == 0) {
+            auto address = sdb::to_integral<std::uint64_t>(args[2], 16);
+            if (!address) {
+                fmt::println(stderr,
+                    "Breakpoint command expects address in hexadecimal, "
+                    "prefixed with '0x'");
+                return;
+            }
+
+            target.create_address_breakpoint(
+                sdb::virt_addr{ *address }, hardware).enable();
+        } else if (args[2].find(':') != std::string::npos) {
+            auto data = split(args[2], ':');
+            auto path = data[0];
+            auto line = sdb::to_integral<std::uint64_t>(data[1]);
+            if (!line) {
+                fmt::println(stderr, "Line member should be an integer");
+                return;
+            }
+            target.create_line_breakpoint(path, *line, hardware).enable();
+        } else {
+            target.create_function_breakpoint(args[2]).enable();
+        }
+    }
+
+    void handle_breakpoint_toggle(sdb::target& target,
+            const std::vector<std::string>& args) {
+        const auto& command = args[1];
+
+        auto dot_pos = args[2].find('.');
+        auto id_str = args[2].substr(0, dot_pos);
+        auto id = sdb::to_integral<sdb::breakpoint::id_type>(id_str);
+        if (!id) {
+            std::cerr << "Command expects breakpoint id";
+            return;
+        }
+        auto& bp = target.breakpoints().get_by_id(*id);
+
+        if (dot_pos != std::string::npos) {
+            auto site_id_str = args[2].substr(dot_pos + 1);
+            auto site_id = sdb::to_integral<sdb::breakpoint_site::id_type>(site_id_str);
+            if (!site_id) {
+                std::cerr << "Command expects breakpoint site id";
+                return;
+            }
+            if (is_prefix(command, "enable")) {
+                bp.breakpoint_sites().get_by_id(*site_id).enable();
+            } else if (is_prefix(command, "disable")) {
+                bp.breakpoint_sites().get_by_id(*site_id).disable();
+            }
+        } else if (is_prefix(command, "enable")) {
+            bp.enable();
+        } else if (is_prefix(command, "disable")) {
+            bp.disable();
+        } else if (is_prefix(command, "delete")) {
+            bp.breakpoint_sites().for_each([&](auto& site) {
+                target.get_process().breakpoint_sites().remove_by_address(
+                    site.address());
+            });
+            target.breakpoints().remove_by_id(*id);
+        }
+    }
+
+    void handle_breakpoint_command(sdb::target& target,
         const std::vector<std::string>& args) {
         if (args.size() < 2) {
             print_help({ "help", "breakpoint" });
@@ -340,17 +437,7 @@ namespace {
         const auto& command = args[1];
 
         if (is_prefix(command, "list")) {
-            if (process.breakpoint_sites().empty()) {
-                fmt::println("No breakpoints set");
-            } else {
-                fmt::println("Current breakpoints:");
-                process.breakpoint_sites().for_each([](auto& site) {
-                    if (site.is_internal()) return;
-                    fmt::println("{}: address = {:#x}, {}",
-                        site.id(), site.address().addr(),
-                        site.is_enabled() ? "enabled" : "disabled");
-                });
-            }
+            handle_breakpoint_list_command(target);
             return;
         }
 
@@ -360,38 +447,11 @@ namespace {
         }
 
         if (is_prefix(command, "set")) {
-            auto address = sdb::to_integral<std::uint64_t>(args[2], 16);
-
-            if (!address) {
-                fmt::println(stderr,
-                    "Breakpoint command expects address in "
-                    "hexadecimal, prefixed with '0x'");
-                return;
-            }
-
-            bool hardware = false;
-            if (args.size() == 4) {
-                if (args[3] == "-h") hardware = true;
-                else sdb::error::send("Invalid breakpoint command argument");
-            }
-
-            process.create_breakpoint_site(sdb::virt_addr{ *address }, hardware).enable();
+            handle_breakpoint_set_command(target, args);
             return;
         }
 
-        auto id = sdb::to_integral<sdb::breakpoint_site::id_type>(args[2]);
-        if (!id) {
-            std::cerr << "Command expects breakpoint id";
-            return;
-        }
-
-        if (is_prefix(command, "enable")) {
-            process.breakpoint_sites().get_by_id(*id).enable();
-        } else if (is_prefix(command, "disable")) {
-            process.breakpoint_sites().get_by_id(*id).disable();
-        } else if (is_prefix(command, "delete")) {
-            process.breakpoint_sites().remove_by_id(*id);
-        }
+        handle_breakpoint_toggle(target, args);
     }
 
     // Reads 32 bytes by default from specified address
@@ -627,7 +687,7 @@ namespace {
         } else if (is_prefix(command, "register")) {
             handle_register_command(*process, args);
         } else if (is_prefix(command, "breakpoint")) {
-            handle_breakpoint_command(*process, args);
+            handle_breakpoint_command(*target, args);
         } else if (is_prefix(command, "stepi")) {
             auto reason = process->step_instruction();
             handle_stop(*target, reason);
