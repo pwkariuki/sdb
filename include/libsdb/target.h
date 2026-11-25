@@ -65,6 +65,8 @@ namespace sdb {
             return breakpoints_;
         }
 
+        std::string function_name_at_address(virt_addr address) const;
+
     private:
         target(std::unique_ptr<process> proc, std::unique_ptr<elf> obj)
             : process_(std::move(proc)), elf_(std::move(obj)), stack_(this) {}

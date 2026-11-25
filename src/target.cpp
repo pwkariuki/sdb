@@ -3,6 +3,7 @@
 //
 
 #include <csignal>
+#include <cxxabi.h>
 #include <optional>
 #include <utility>
 #include <libsdb/bit.h>
@@ -219,4 +220,21 @@ sdb::breakpoint & sdb::target::create_line_breakpoint(std::filesystem::path file
         std::unique_ptr<line_breakpoint>(
             new line_breakpoint(
                 *this, std::move(file), line, hardware, internal)));
+}
+
+std::string sdb::target::function_name_at_address(virt_addr address) const {
+    auto file_address = address.to_file_addr(*elf_);
+    auto obj = file_address.elf_file();
+    if (!obj) return "";
+
+    auto func = obj->get_dwarf().function_containing_address(file_address);
+    if (func and func->name()) {
+        return std::string{ *func->name() };
+    }
+    if (auto elf_func = obj->get_symbol_containing_address(file_address);
+        elf_func and ELF64_ST_TYPE(elf_func.value()->st_info) == STT_FUNC) {
+        auto elf_name = std::string{ obj->get_string(elf_func.value()->st_name) };
+        return abi::__cxa_demangle(elf_name.c_str(), nullptr, nullptr, nullptr);
+    }
+    return "";
 }
