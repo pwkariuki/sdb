@@ -646,3 +646,89 @@ TEST_CASE("line table", "[dwarf]") {
     ++it;
     REQUIRE(it == cu->lines().end());
 }
+
+TEST_CASE("Source-level breakpoints", "[breakpoint]") {
+    auto dev_null = open("/dev/null", O_WRONLY);
+    auto target = target::launch("targets/overloaded", dev_null);
+    auto& proc = target->get_process();
+
+    target->create_line_breakpoint("overloaded.cpp", 21).enable();
+
+    proc.resume();
+    proc.wait_on_signal();
+
+    auto entry = target->line_entry_at_pc();
+    REQUIRE(entry->file_entry->path.filename() == "overloaded.cpp");
+    REQUIRE(entry->line == 21);
+
+    auto& bp = target->create_function_breakpoint("print_type");
+    bp.enable();
+
+    breakpoint_site* lowest_bp = nullptr;
+    bp.breakpoint_sites().for_each([&lowest_bp](auto& site) {
+        if (lowest_bp == nullptr or
+            site.address().addr() < lowest_bp->address().addr()) {
+            lowest_bp = &site;
+        }
+    });
+    lowest_bp->disable();
+
+    proc.resume();
+    proc.wait_on_signal();
+
+    REQUIRE(target->line_entry_at_pc()->line == 13);
+
+    proc.resume();
+    proc.wait_on_signal();
+
+    REQUIRE(target->line_entry_at_pc()->line == 17);
+
+    proc.resume();
+    auto reason = proc.wait_on_signal();
+
+    REQUIRE(reason.reason == process_state::exited);
+    close(dev_null);
+}
+
+TEST_CASE("Source-level stepping", "[target]") {
+    auto dev_null = open("/dev/null", O_WRONLY);
+    auto target = target::launch("targets/step", dev_null);
+    auto& proc = target->get_process();
+
+    target->create_function_breakpoint("main").enable();
+    proc.resume();
+    proc.wait_on_signal();
+
+    auto pc = proc.get_pc();
+    REQUIRE(target->function_name_at_address(pc) == "main");
+
+    target->step_over();
+
+    auto new_pc = proc.get_pc();
+    REQUIRE(new_pc != pc);
+    REQUIRE(target->function_name_at_address(pc) == "main");
+
+    target->step_in();
+
+    pc = proc.get_pc();
+    REQUIRE(target->function_name_at_address(pc) == "find_happiness");
+    REQUIRE(target->get_stack().inline_height() == 2);
+
+    target->step_in();
+
+    new_pc = proc.get_pc();
+    REQUIRE(new_pc == pc);
+    REQUIRE(target->get_stack().inline_height() == 1);
+
+    target->step_out();
+
+    new_pc = proc.get_pc();
+    REQUIRE(new_pc != pc);
+    REQUIRE(target->function_name_at_address(pc) == "find_happiness");
+
+    target->step_out();
+
+    pc = proc.get_pc();
+    REQUIRE(target->function_name_at_address(pc) == "main");
+    close(dev_null);
+}
